@@ -1,6 +1,6 @@
 import { messages } from '$lib/stores/messages.svelte.js';
 import { activeSession, sessions } from '$lib/stores/session.svelte.js';
-import { isStreaming, rpcRunning } from '$lib/stores/rpc.svelte.js';
+import { isStreaming } from '$lib/stores/rpc.svelte.js';
 import { fetchSessions } from '$lib/api/sessions.js';
 import { detectLanguageFromPath } from '$lib/utils/language.js';
 import { unescapeJsonString } from '$lib/utils/json.js';

@@ -1,11 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import { wsConnected } from '$lib/stores/ws.svelte.js';
-  import { activeSession } from '$lib/stores/session.svelte.js';
+  import { activeSession, sessions } from '$lib/stores/session.svelte.js';
   import { sidebarOpen } from '$lib/stores/ui.svelte.js';
   import { quitSession } from '$lib/actions/session.js';
+  import { createSession, fetchSessions } from '$lib/api/sessions.js';
+  import { selectSession } from '$lib/actions/session.js';
 
   let sessionInfo = $state(null);
+  let creating = $state(false);
 
   function fetchSessionInfo(id) {
     if (id) {
@@ -15,6 +18,23 @@
         .catch(() => { sessionInfo = null; });
     } else {
       sessionInfo = null;
+    }
+  }
+
+  async function handleNewSession() {
+    if (!sessionInfo?.cwd || creating) return;
+    creating = true;
+    try {
+      const data = await createSession(sessionInfo.cwd);
+      const list = await fetchSessions();
+      sessions.set(list);
+      if (data.session_id) {
+        setTimeout(() => selectSession(data.session_id), 300);
+      }
+    } catch (e) {
+      console.error('Failed to create session:', e);
+    } finally {
+      creating = false;
     }
   }
 
@@ -82,6 +102,17 @@
     >
       {escapeHTML(sessionInfo.model)}
     </span>
+  {/if}
+
+  {#if sessionInfo?.cwd}
+    <button
+      class="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-ctp-green/20 text-ctp-green hover:bg-ctp-green/30 transition-colors"
+      disabled={creating}
+      onclick={handleNewSession}
+      title="New session in {sessionInfo.cwd}"
+    >
+      {creating ? '...' : '+ New'}
+    </button>
   {/if}
 
   {#if $activeSession}

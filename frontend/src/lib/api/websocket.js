@@ -12,14 +12,12 @@ export function connectWS() {
   socket.onopen = () => {
     wsConnected.set(true);
     console.log('WS connected');
-    // Subscribe to active session if any
+    // Re-subscribe to active session on reconnect
     const unsub = activeSession.subscribe(id => {
       if (id && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: 'subscribe', session_id: id }));
       }
     });
-    // Trigger once immediately
-    unsub();
   };
 
   socket.onclose = () => {

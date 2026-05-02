@@ -1,10 +1,10 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { messages } from '$lib/stores/messages.svelte.js';
-  import { rpcRunning, isStreaming } from '$lib/stores/rpc.svelte.js';
+  import { rpcRunning, isStreaming, rpcAutoStarting, isRpcRunning } from '$lib/stores/rpc.svelte.js';
   import { activeSession } from '$lib/stores/session.svelte.js';
   import { userScrolledUp, newMessageCount } from '$lib/stores/messages.svelte.js';
-  import { sendMessage, toggleRPC, abortRPC } from '$lib/actions/rpc.js';
+  import { sendMessage, abortRPC } from '$lib/actions/rpc.js';
   import { quitSession } from '$lib/actions/session.js';
   import MessageBubble from './MessageBubble.svelte';
   import AssistantBubble from './AssistantBubble.svelte';
@@ -17,6 +17,45 @@
   let textareaEl = $state(null);
   let chatContainer = $state(null);
   let showScrollBtn = $state(false);
+  let rpcMap = $state(new Map());
+
+  onMount(() => {
+    // Subscribe to rpcRunning store to get reactive updates
+    const unsubRpc = rpcRunning.subscribe(map => {
+      rpcMap = new Map(map);
+    });
+
+    // Subscribe to messages changes for auto-scroll
+    const unsubMsgs = messages.subscribe(async msgs => {
+      if (!chatContainer || msgs.length === 0) return;
+
+      // Wait for DOM to update with new messages
+      await tick();
+
+      // Check if user has scrolled up (tracked by handleScroll on scroll events)
+      let scrolledUp = false;
+      userScrolledUp.subscribe(v => { scrolledUp = v; })();
+
+      if (!scrolledUp) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        showScrollBtn = false;
+        newMessageCount.set(0);
+      } else {
+        newMessageCount.update(n => n + 1);
+        showScrollBtn = true;
+      }
+    });
+
+    return () => {
+      unsubRpc();
+      unsubMsgs();
+    };
+  });
+
+  // Derive RPC status for the active session
+  function activeRpcRunning() {
+    return $activeSession ? rpcMap.get($activeSession) === true : false;
+  }
 
   function handleSend() {
     const text = input.trim();
@@ -54,23 +93,6 @@
       showScrollBtn = false;
     }
   }
-
-  onMount(() => {
-    // Subscribe to messages changes for auto-scroll
-    const unsub = messages.subscribe(msgs => {
-      if (!chatContainer || msgs.length === 0) return;
-      const atBottom = isAtBottom(chatContainer);
-      if (atBottom) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        showScrollBtn = false;
-      } else {
-        newMessageCount.update(n => n + 1);
-        showScrollBtn = true;
-      }
-    });
-
-    return unsub;
-  });
 </script>
 
 <div class="flex-1 flex flex-col min-h-0">
@@ -82,7 +104,7 @@
   >
     {#if $messages.length === 0}
       <div class="flex items-center justify-center h-full text-ctp-overlay0 text-sm">
-        Select a session and start RPC to begin chatting
+        {$activeSession ? 'Type a message to start chatting' : 'Select a session to begin'}
       </div>
     {:else}
       {#each $messages as msg (msg.id)}
@@ -104,7 +126,7 @@
         {/if}
       {/each}
 
-      {#if $isStreaming === false && $rpcRunning}
+      {#if $isStreaming === false && activeRpcRunning()}
         <!-- Show loading indicator while waiting for response -->
       {/if}
     {/if}
@@ -123,17 +145,17 @@
         bind:value={input}
         class="flex-1 px-3 py-2 bg-ctp-crust border border-ctp-surface0 rounded-lg text-ctp-text text-sm font-mono resize-none focus:outline-none focus:border-ctp-blue placeholder:text-ctp-overlay0"
         rows="1"
-        placeholder={$rpcRunning ? 'Type a message...' : 'Select a session and start RPC to chat...'}
-        disabled={$rpcRunning === false}
+        placeholder={$activeSession ? 'Type a message...' : 'Select a session to begin...'}
+        disabled={$activeSession === null}
         onkeydown={handleKeydown}
         oninput={() => autoResize(textareaEl)}
       ></textarea>
       <button
         class="px-4 py-2 rounded-lg text-sm font-semibold bg-ctp-blue text-ctp-crust hover:bg-ctp-blue/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-        disabled={$rpcRunning === false}
+        disabled={$activeSession === null}
         onclick={handleSend}
       >
-        {$isStreaming ? 'Queue' : 'Send'}
+        {$isStreaming ? 'Queue' : ($rpcAutoStarting ? 'Starting...' : 'Send')}
       </button>
     </div>
 
@@ -144,22 +166,18 @@
         {#if $isStreaming}
           <span>Streaming... messages will be queued</span>
         {/if}
+        {#if $rpcAutoStarting}
+          <span class="text-ctp-yellow">Starting RPC...</span>
+        {/if}
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-1.5">
           <div
             class="w-2 h-2 rounded-full transition-colors duration-300"
-            style="background: {$rpcRunning ? '#a6e3a1' : '#6c7086'}"
+            style="background: {activeRpcRunning() || $rpcAutoStarting ? '#a6e3a1' : '#6c7086'}"
           ></div>
-          <span>{$rpcRunning ? 'RPC: active' : 'RPC: idle'}</span>
+          <span>{$rpcAutoStarting ? 'RPC: starting' : (activeRpcRunning() ? 'RPC: active' : 'RPC: idle')}</span>
         </div>
-        <button
-          class="px-3 py-1 rounded-md text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed {$rpcRunning ? 'bg-ctp-red/20 text-ctp-red' : 'bg-ctp-surface0 text-ctp-overlay0'}"
-          disabled={$activeSession === null}
-          onclick={() => toggleRPC()}
-        >
-          {$rpcRunning ? 'Stop RPC' : 'Start RPC'}
-        </button>
         {#if $isStreaming}
           <button
             class="px-3 py-1 rounded-md text-xs font-semibold bg-ctp-red/20 text-ctp-red hover:bg-ctp-red/30 transition-colors"
@@ -168,7 +186,7 @@
             ⏹ Abort
           </button>
         {/if}
-        {#if $activeSession && $rpcRunning}
+        {#if $activeSession && activeRpcRunning()}
           <button
             class="px-3 py-1 rounded-md text-xs font-semibold bg-ctp-red/20 text-ctp-red hover:bg-ctp-red/30 transition-colors"
             onclick={quitSession}

@@ -27,3 +27,9 @@ export async function sendRPC(sessionId, command) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getRPCStatus() {
+  const res = await fetch('/api/rpc/status');
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
