@@ -63,6 +63,12 @@ function initScrollTracking() {
   });
 }
 
+// Check scroll position without relying on event — call before each scroll
+function checkScrollPosition() {
+  const atBottom = isAtBottom(chatMessages);
+  setUserScrolledUp(!atBottom);
+}
+
 function showScrollDownButton() {
   let btn = document.getElementById('scrollDownBtn');
   if (!btn) {
@@ -218,7 +224,10 @@ function startAssistantMessage() {
   `;
   chatMessages.appendChild(row);
   setCurrentAssistantEl(row);
-  scrollToBottom(chatMessages, userScrolledUp);
+  checkScrollPosition();
+  if (!userScrolledUp) {
+    scrollToBottom(chatMessages, false);
+  }
   return row.querySelector('.assistant-content');
 }
 
@@ -232,7 +241,10 @@ function appendAssistantText(delta) {
   }
   content.dataset.raw = (content.dataset.raw || '') + delta;
   content.innerHTML = formatText(content.dataset.raw);
-  scrollToBottom(chatMessages, userScrolledUp);
+  checkScrollPosition();
+  if (!userScrolledUp) {
+    scrollToBottom(chatMessages, false);
+  }
   if (userScrolledUp) {
     setNewMessageCount(newMessageCount + 1);
     showScrollDownButton();
@@ -266,7 +278,10 @@ function appendAssistantThinking(delta) {
     content.insertBefore(thinkingEl, content.firstChild);
   }
   thinkingEl.querySelector('pre').textContent += delta;
-  scrollToBottom(chatMessages, userScrolledUp);
+  checkScrollPosition();
+  if (!userScrolledUp) {
+    scrollToBottom(chatMessages, false);
+  }
   if (userScrolledUp) {
     setNewMessageCount(newMessageCount + 1);
     showScrollDownButton();
@@ -296,7 +311,10 @@ function startToolCall(ev) {
     </div>
   `;
   content.appendChild(toolEl);
-  scrollToBottom(chatMessages, userScrolledUp);
+  checkScrollPosition();
+  if (!userScrolledUp) {
+    scrollToBottom(chatMessages, false);
+  }
   if (userScrolledUp) {
     setNewMessageCount(newMessageCount + 1);
     showScrollDownButton();
