@@ -70,7 +70,7 @@ func (d *ClaudeDecoder) Next() (*Event, error) {
 }
 
 func (d *ClaudeDecoder) processLine(raw string) (*Event, error) {
-	normalized, drop := normalizeClaudeLine(raw)
+	normalized, drop := d.normalizeClaudeLine(raw)
 	if drop {
 		return nil, nil
 	}
@@ -109,7 +109,7 @@ func (d *ClaudeDecoder) Close() error { return d.file.Close() }
 
 // normalizeClaudeLine converts a Claude Code JSONL line to pi-agent format.
 // Returns (normalizedJSON, drop) where drop=true means the line should be ignored.
-func normalizeClaudeLine(raw string) (string, bool) {
+func (d *ClaudeDecoder) normalizeClaudeLine(raw string) (string, bool) {
 	var base struct {
 		Type string `json:"type"`
 	}
@@ -122,10 +122,10 @@ func normalizeClaudeLine(raw string) (string, bool) {
 		return "", true // drop these
 
 	case "assistant":
-		return normalizeAssistant(raw)
+		return d.normalizeAssistant(raw)
 
 	case "user":
-		return normalizeUser(raw)
+		return d.normalizeUser(raw)
 
 	case "ai-title", "system":
 		return raw, false // forward as-is
@@ -136,7 +136,7 @@ func normalizeClaudeLine(raw string) (string, bool) {
 }
 
 // normalizeAssistant converts a Claude "assistant" event to pi "message" format.
-func normalizeAssistant(raw string) (string, bool) {
+func (d *ClaudeDecoder) normalizeAssistant(raw string) (string, bool) {
 	var evt ClaudeEvent
 	if err := json.Unmarshal([]byte(raw), &evt); err != nil {
 		return "", true
@@ -145,9 +145,9 @@ func normalizeAssistant(raw string) (string, bool) {
 		return "", true
 	}
 
-	// Build normalized content blocks
+	// Build normalized content blocks from the content array
 	var normalizedContent []json.RawMessage
-	for _, block := range evt.Message.Content {
+	for _, block := range evt.Message.Content.AsBlocks {
 		switch block.Type {
 		case "text":
 			b, _ := json.Marshal(map[string]string{
@@ -216,7 +216,8 @@ func normalizeAssistant(raw string) (string, bool) {
 
 // normalizeUser converts a Claude "user" event to pi "message" format.
 // Tool results are extracted into separate toolResult messages.
-func normalizeUser(raw string) (string, bool) {
+// User messages have content as a plain string OR as an array of blocks (for tool_result).
+func (d *ClaudeDecoder) normalizeUser(raw string) (string, bool) {
 	var evt ClaudeEvent
 	if err := json.Unmarshal([]byte(raw), &evt); err != nil {
 		return "", true
@@ -225,8 +226,33 @@ func normalizeUser(raw string) (string, bool) {
 		return "", true
 	}
 
-	// Check if this is a tool_result message
-	for _, block := range evt.Message.Content {
+	// If content is a plain string, it's a regular user text message
+	if evt.Message.Content.IsString {
+		content := evt.Message.Content.AsString
+		if content == "" {
+			return "", true
+		}
+		result := map[string]interface{}{
+			"type":      "message",
+			"id":        evt.UUID,
+			"timestamp": evt.Timestamp,
+			"message": map[string]interface{}{
+				"role":    "user",
+				"content": content,
+			},
+		}
+		if evt.ParentUUID != nil {
+			result["parentId"] = *evt.ParentUUID
+		}
+		out, err := json.Marshal(result)
+		if err != nil {
+			return "", true
+		}
+		return string(out), false
+	}
+
+	// Content is an array of blocks — check for tool_result
+	for _, block := range evt.Message.Content.AsBlocks {
 		if block.Type == "tool_result" {
 			result := map[string]interface{}{
 				"type":      "message",
@@ -250,9 +276,9 @@ func normalizeUser(raw string) (string, bool) {
 		}
 	}
 
-	// Regular user message — extract text from content blocks
+	// Non-tool_result block content — extract text blocks
 	var texts []string
-	for _, block := range evt.Message.Content {
+	for _, block := range evt.Message.Content.AsBlocks {
 		if block.Type == "text" {
 			texts = append(texts, block.Text)
 		}
@@ -260,7 +286,7 @@ func normalizeUser(raw string) (string, bool) {
 
 	content := strings.Join(texts, "\n")
 	if content == "" {
-		return "", true // no useful content
+		return "", true
 	}
 
 	result := map[string]interface{}{
