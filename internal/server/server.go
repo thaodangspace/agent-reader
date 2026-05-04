@@ -188,13 +188,40 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 // ===== REST API =====
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/api/sessions" || r.URL.RawQuery != "" {
+	if r.URL.Path != "/api/sessions" {
 		return
 	}
 
+	// Parse page parameter (default: 1)
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		fmt.Sscanf(p, "%d", &page)
+		if page < 1 {
+			page = 1
+		}
+	}
+
 	sessions := s.listSessions()
+	total := len(sessions)
+
+	// Paginate: 100 sessions per page
+	const pageSize = 100
+	offset := (page - 1) * pageSize
+	if offset >= total {
+		sessions = []SessionInfo{}
+	} else {
+		end := offset + pageSize
+		if end > total {
+			end = total
+		}
+		sessions = sessions[offset:end]
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessions)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"sessions": sessions,
+		"total":    total,
+	})
 }
 
 func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {

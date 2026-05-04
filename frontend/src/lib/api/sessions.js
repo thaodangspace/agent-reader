@@ -1,7 +1,8 @@
 export async function fetchSessions() {
-  const res = await fetch('/api/sessions');
+  const res = await fetch('/api/sessions?page=1');
   if (!res.ok) throw new Error('Failed to fetch sessions');
-  return res.json();
+  const data = await res.json();
+  return data.sessions;
 }
 
 export async function fetchSession(id) {
