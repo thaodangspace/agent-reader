@@ -324,3 +324,64 @@ func TestNormalizeUser_DropsIsMeta(t *testing.T) {
 		t.Fatal("expected isMeta:true user message to be dropped")
 	}
 }
+
+func TestNormalizeUser_ToolResultIncludesToolName(t *testing.T) {
+	dec := &ClaudeDecoder{toolNames: map[string]string{
+		"toolu_abc": "Bash",
+	}}
+
+	input := `{
+		"type": "user",
+		"uuid": "user-evt-001",
+		"timestamp": "2026-05-03T10:00:01Z",
+		"message": {
+			"role": "user",
+			"content": [
+				{"type": "tool_result", "content": "ok", "tool_use_id": "toolu_abc"}
+			]
+		}
+	}`
+
+	out, drop := dec.normalizeUser(input)
+	if drop {
+		t.Fatal("expected not to drop")
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	msg := result["message"].(map[string]interface{})
+	if msg["toolName"] != "Bash" {
+		t.Errorf("expected toolName=Bash, got %v", msg["toolName"])
+	}
+}
+
+func TestNormalizeUser_ToolResultUnknownToolName(t *testing.T) {
+	// If we never saw the originating tool_use (e.g. resumed mid-session),
+	// the toolName field is omitted so the frontend keeps its 'unknown' fallback.
+	dec := &ClaudeDecoder{toolNames: map[string]string{}}
+
+	input := `{
+		"type": "user",
+		"uuid": "user-evt-002",
+		"timestamp": "2026-05-03T10:00:02Z",
+		"message": {
+			"role": "user",
+			"content": [
+				{"type": "tool_result", "content": "ok", "tool_use_id": "toolu_missing"}
+			]
+		}
+	}`
+
+	out, drop := dec.normalizeUser(input)
+	if drop {
+		t.Fatal("expected not to drop")
+	}
+	var result map[string]interface{}
+	json.Unmarshal([]byte(out), &result)
+	msg := result["message"].(map[string]interface{})
+	if _, ok := msg["toolName"]; ok {
+		t.Errorf("expected toolName to be omitted when unknown, got %v", msg["toolName"])
+	}
+}

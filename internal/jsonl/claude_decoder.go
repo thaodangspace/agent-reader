@@ -262,16 +262,22 @@ func (d *ClaudeDecoder) normalizeUser(raw string) (string, bool) {
 	// Content is an array of blocks — check for tool_result
 	for _, block := range evt.Message.Content.AsBlocks {
 		if block.Type == "tool_result" {
+			msg := map[string]interface{}{
+				"role":       "toolResult",
+				"toolCallId": block.ToolUseID,
+				"content":    block.Content,
+				"isError":    false,
+			}
+			if d.toolNames != nil {
+				if name, ok := d.toolNames[block.ToolUseID]; ok && name != "" {
+					msg["toolName"] = name
+				}
+			}
 			result := map[string]interface{}{
 				"type":      "message",
 				"id":        evt.UUID,
 				"timestamp": evt.Timestamp,
-				"message": map[string]interface{}{
-					"role":       "toolResult",
-					"toolCallId": block.ToolUseID,
-					"content":    block.Content,
-					"isError":    false,
-				},
+				"message":   msg,
 			}
 			if evt.ParentUUID != nil {
 				result["parentId"] = *evt.ParentUUID
