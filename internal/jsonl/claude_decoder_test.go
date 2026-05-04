@@ -8,7 +8,7 @@ import (
 )
 
 func newTestDecoder() *ClaudeDecoder {
-	return &ClaudeDecoder{}
+	return &ClaudeDecoder{toolNames: map[string]string{}}
 }
 
 func TestNormalizeAssistant_Basic(t *testing.T) {
@@ -272,6 +272,34 @@ func TestClaudeDecoder_Next(t *testing.T) {
 	ev, err = dec.Next()
 	if err != io.EOF {
 		t.Fatalf("expected EOF, got err=%v", err)
+	}
+}
+
+func TestNormalizeAssistant_RecordsToolNames(t *testing.T) {
+	dec := &ClaudeDecoder{toolNames: map[string]string{}}
+
+	input := `{
+		"type": "assistant",
+		"uuid": "asst-001",
+		"timestamp": "2026-05-03T10:00:00Z",
+		"message": {
+			"role": "assistant",
+			"content": [
+				{"type": "tool_use", "id": "toolu_abc", "name": "Read", "input": {"file_path": "/x"}},
+				{"type": "tool_use", "id": "toolu_def", "name": "Bash", "input": {"command": "ls"}}
+			]
+		}
+	}`
+
+	if _, drop := dec.normalizeAssistant(input); drop {
+		t.Fatal("expected not to drop")
+	}
+
+	if got := dec.toolNames["toolu_abc"]; got != "Read" {
+		t.Errorf("toolu_abc: expected Read, got %q", got)
+	}
+	if got := dec.toolNames["toolu_def"]; got != "Bash" {
+		t.Errorf("toolu_def: expected Bash, got %q", got)
 	}
 }
 

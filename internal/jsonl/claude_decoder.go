@@ -11,10 +11,11 @@ import (
 
 // ClaudeDecoder reads a Claude Code JSONL file and emits normalized pi-agent format events.
 type ClaudeDecoder struct {
-	path   string
-	offset int64
-	file   *os.File
-	reader *bufio.Reader
+	path      string
+	offset    int64
+	file      *os.File
+	reader    *bufio.Reader
+	toolNames map[string]string // tool_use_id -> tool name, populated from assistant events
 }
 
 // NewClaudeDecoder opens a Claude Code JSONL file for reading.
@@ -30,10 +31,11 @@ func NewClaudeDecoder(path string, offset int64) (*ClaudeDecoder, error) {
 		}
 	}
 	return &ClaudeDecoder{
-		path:   path,
-		offset: offset,
-		file:   f,
-		reader: bufio.NewReader(f),
+		path:      path,
+		offset:    offset,
+		file:      f,
+		reader:    bufio.NewReader(f),
+		toolNames: make(map[string]string),
 	}, nil
 }
 
@@ -164,6 +166,9 @@ func (d *ClaudeDecoder) normalizeAssistant(raw string) (string, bool) {
 			normalizedContent = append(normalizedContent, b)
 
 		case "tool_use":
+			if d.toolNames != nil && block.ID != "" && block.Name != "" {
+				d.toolNames[block.ID] = block.Name
+			}
 			// tool_use → toolCall, input → arguments
 			b, _ := json.Marshal(map[string]interface{}{
 				"type":      "toolCall",
