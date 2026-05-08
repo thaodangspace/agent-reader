@@ -51,12 +51,16 @@
     onclick={() => selectSession(session.id)}
   >
     <div class="flex items-center justify-between">
-      <div class="text-xs text-ctp-text">{session.project}</div>
+      <div class="text-xs text-ctp-text truncate">{session.project}</div>
       {#if session.last_message_time}
         <div class="text-[10px] text-ctp-overlay0">{session.last_message_time}</div>
       {/if}
     </div>
-    <div class="text-[11px] text-ctp-overlay1 break-all">{session.id}</div>
+    {#if session.first_user_message}
+      <div class="text-[11px] text-ctp-overlay1 truncate" title={session.first_user_message}>{session.first_user_message}</div>
+    {:else}
+      <div class="text-[11px] text-ctp-overlay1 break-all">{session.id}</div>
+    {/if}
     <div class="text-[10px] text-ctp-overlay0 mt-0.5">{session.cwd}</div>
     <div class="flex items-center gap-2 mt-0.5">
       <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-ctp-mauve/20 text-ctp-mauve">{session.agent || 'pi'}</span>

@@ -53,10 +53,10 @@
   }
 </script>
 
-<div class="px-5 py-2.5 border-b border-ctp-surface0 flex items-center gap-3 bg-ctp-mantle flex-wrap">
+<div class="px-5 py-2.5 border-b border-ctp-crust flex items-center gap-3 bg-ctp-mantle flex-wrap">
   <div
     class="w-2 h-2 rounded-full transition-colors duration-300"
-    style="background: {$wsConnected ? '#a6e3a1' : '#f38ba8'}"
+    style="background: {$wsConnected ? '#28a745' : '#d73a49'}"
   ></div>
   <span class="text-sm text-ctp-overlay0 shrink-0">{$wsConnected ? 'Connected' : 'Disconnected'}</span>
 
@@ -79,7 +79,7 @@
       {#if sessionInfo.project}
         <span
           class="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
-          style="background:color-mix(in srgb, #cba6f7 20%, transparent); color:#cba6f7"
+          style="background:color-mix(in srgb, #6f42c1 12%, transparent); color:#6f42c1"
         >
           {escapeHTML(sessionInfo.project)}
         </span>
@@ -87,41 +87,25 @@
       {#if sessionInfo.cwd}
         <span
           class="text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap text-ctp-overlay0"
-          style="background:color-mix(in srgb, #585b70 20%, transparent)"
+          style="background:color-mix(in srgb, #e1e4e8 60%, transparent)"
         >
           {sessionInfo.cwd.length > 50 ? '...' + sessionInfo.cwd.slice(-47) : sessionInfo.cwd}
         </span>
       {/if}
-      {#if sessionInfo.line_count}
-        <span
-          class="text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap text-ctp-overlay0"
-          style="background:color-mix(in srgb, #585b70 20%, transparent)"
-        >
-          {sessionInfo.line_count} lines
-        </span>
-      {/if}
+
     {:else if $activeSession}
       <span
         class="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
-        style="background:color-mix(in srgb, #cba6f7 20%, transparent); color:#cba6f7"
+        style="background:color-mix(in srgb, #6f42c1 12%, transparent); color:#6f42c1"
       >
         {$activeSession.substring(0, 12)}...
       </span>
     {/if}
   </div>
 
-  {#if sessionInfo?.model}
-    <span
-      class="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
-      style="background:color-mix(in srgb, #89b4fa 20%, transparent); color:#89b4fa"
-    >
-      {escapeHTML(sessionInfo.model)}
-    </span>
-  {/if}
-
   {#if sessionInfo?.cwd}
     <button
-      class="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-ctp-green/20 text-ctp-green hover:bg-ctp-green/30 transition-colors"
+      class="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-ctp-green/15 text-ctp-green hover:bg-ctp-green/25 transition-colors"
       disabled={creating}
       onclick={handleNewSession}
       title="New session in {sessionInfo.cwd}"
@@ -132,7 +116,7 @@
 
   {#if $activeSession}
     <button
-      class="px-3 py-1 rounded-md text-xs font-semibold bg-ctp-red/20 text-ctp-red hover:bg-ctp-red/30 transition-colors"
+      class="px-3 py-1 rounded-md text-xs font-semibold bg-ctp-red/15 text-ctp-red hover:bg-ctp-red/25 transition-colors"
       onclick={quitSession}
     >
       Quit Session
@@ -141,7 +125,7 @@
 
   <!-- Mobile hamburger -->
   <button
-    class="md:hidden absolute top-2.5 left-2.5 z-[60] p-1.5 rounded-md bg-ctp-surface0 text-ctp-text hover:bg-ctp-surface1"
+    class="md:hidden absolute top-2.5 left-2.5 z-[60] p-1.5 rounded-md bg-ctp-crust text-ctp-text hover:bg-ctp-surface0"
     onclick={() => sidebarOpen.update(v => !v)}
   >
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

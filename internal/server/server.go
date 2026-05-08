@@ -1056,8 +1056,9 @@ type SessionInfo struct {
 	ContextWindow   int64     `json:"context_window"`
 	Agent           string    `json:"agent"`
 	Timestamp       time.Time `json:"timestamp"`
-	LastMessageTime string    `json:"last_message_time"`
-	File            string    `json:"file"`
+	FirstUserMessage string    `json:"first_user_message"`
+	LastMessageTime  string    `json:"last_message_time"`
+	File             string    `json:"file"`
 	LineCount       int       `json:"line_count"`
 	InputTokens     int64     `json:"input_tokens"`
 	OutputTokens    int64     `json:"output_tokens"`
@@ -1089,6 +1090,7 @@ func (s *Server) listSessions() []SessionInfo {
 		}
 
 		info.LineCount, info.CWD, info.Model, info.InputTokens, info.OutputTokens, info.TotalTokens, info.TotalCost, info.ContextWindow = aggregateSessionData(path, "pi")
+		info.FirstUserMessage = getFirstUserMessage(path, "pi")
 		info.LastMessageTime = getLastMessageTime(path)
 
 		if fi, err := d.Info(); err == nil {
@@ -1116,6 +1118,7 @@ func (s *Server) listSessions() []SessionInfo {
 			info.ID = strings.TrimSuffix(base, ".jsonl")
 
 			info.LineCount, info.CWD, info.Model, info.InputTokens, info.OutputTokens, info.TotalTokens, info.TotalCost, info.ContextWindow = aggregateSessionData(path, "claude")
+			info.FirstUserMessage = getFirstUserMessage(path, "claude")
 			info.LastMessageTime = getLastMessageTime(path)
 
 			if fi, err := d.Info(); err == nil {
@@ -1330,6 +1333,80 @@ func aggregateSessionData(path string, agent string) (lineCount int, cwd string,
 
 	contextWindow = getContextWindow(model)
 	return count, cwd, model, inputTokens, outputTokens, totalTokens, totalCost, contextWindow
+}
+
+// getFirstUserMessage reads the JSONL file and returns the text content of the first user message (truncated to 200 chars).
+func getFirstUserMessage(path string, agent string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	buf := make([]byte, 32*1024)
+	scanner := NewLineScanner(f, buf)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+
+		if agent == "pi" {
+			var evt struct {
+				Type    string `json:"type"`
+				Message *struct {
+					Role    string `json:"role"`
+					Content []struct {
+						Type string `json:"type"`
+						Text string `json:"text"`
+					} `json:"content"`
+				} `json:"message"`
+			}
+			if json.Unmarshal(line, &evt) == nil && evt.Type == "message" && evt.Message != nil && evt.Message.Role == "user" {
+				for _, block := range evt.Message.Content {
+					if block.Type == "text" && block.Text != "" {
+						return truncateMessage(block.Text)
+					}
+				}
+			}
+		} else {
+			// Claude: content can be string or array
+			var evtStr struct {
+				Type    string `json:"type"`
+				Message *struct {
+					Role    string `json:"role"`
+					Content string `json:"content"`
+				} `json:"message"`
+			}
+			if json.Unmarshal(line, &evtStr) == nil && evtStr.Type == "user" && evtStr.Message != nil && evtStr.Message.Role == "user" && evtStr.Message.Content != "" {
+				return truncateMessage(evtStr.Message.Content)
+			}
+			var evtArr struct {
+				Type    string `json:"type"`
+				Message *struct {
+					Role    string `json:"role"`
+					Content []struct {
+						Type string `json:"type"`
+						Text string `json:"text"`
+					} `json:"content"`
+				} `json:"message"`
+			}
+			if json.Unmarshal(line, &evtArr) == nil && evtArr.Type == "user" && evtArr.Message != nil && evtArr.Message.Role == "user" {
+				for _, block := range evtArr.Message.Content {
+					if block.Type == "text" && block.Text != "" {
+						return truncateMessage(block.Text)
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func truncateMessage(s string) string {
+	const maxLen = 200
+	if len(s) > maxLen {
+		return s[:maxLen] + "…"
+	}
+	return s
 }
 
 // getLastMessageTime reads the last line of the JSONL file and returns a formatted timestamp.
