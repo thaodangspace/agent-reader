@@ -1,5 +1,6 @@
 <script>
   import { escapeHTML } from '$lib/utils/markdown.js';
+  import { ChevronRight, ChevronDown, FilePenLine } from '@lucide/svelte';
 
   let { filePath, edits } = $props();
 
@@ -333,11 +334,14 @@
     class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer"
     onclick={toggle}
   >
-    <span
-      class="transition-transform duration-200 text-[10px]"
-      style="transform: {collapsed ? '' : 'rotate(90deg)'}"
-    >▶</span>
-    <span>📝</span>
+    <span class="flex items-center">
+      {#if collapsed}
+        <ChevronRight size={12} />
+      {:else}
+        <ChevronDown size={12} />
+      {/if}
+    </span>
+    <FilePenLine size={14} class="text-[#65b73b]" />
     <span class="font-semibold" style="color:#65b73b">edit</span>
     <span class="text-ctp-overlay0 text-[10px] ml-auto truncate max-w-[300px]" title={filePath}>
       {(filePath ?? '').split('/').slice(-2).join('/')}

@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { X, ChevronLeft, ChevronRight } from '@lucide/svelte';
 
   let { images, startIndex = 0, onClose } = $props();
   let currentIndex = $state(startIndex);
@@ -53,7 +54,7 @@
              bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
       onclick={close}
     >
-      ✕
+      <X class="w-4 h-4" />
     </button>
 
     <!-- Counter -->
@@ -67,10 +68,10 @@
     {#if total > 1}
       <button
         class="absolute left-4 z-10 w-12 h-12 flex items-center justify-center rounded-full
-               bg-white/10 hover:bg-white/20 text-white text-xl transition-colors cursor-pointer"
+               bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
         onclick={prev}
       >
-        ‹
+        <ChevronLeft class="w-6 h-6" />
       </button>
     {/if}
 
@@ -78,10 +79,10 @@
     {#if total > 1}
       <button
         class="absolute right-4 z-10 w-12 h-12 flex items-center justify-center rounded-full
-               bg-white/10 hover:bg-white/20 text-white text-xl transition-colors cursor-pointer"
+               bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
         onclick={next}
       >
-        ›
+        <ChevronRight class="w-6 h-6" />
       </button>
     {/if}
 

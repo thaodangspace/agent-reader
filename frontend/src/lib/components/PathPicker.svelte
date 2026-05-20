@@ -1,5 +1,6 @@
 <script>
   import { browseFS, searchFS } from '$lib/api/fs.js';
+  import { Folder, CornerUpLeft, FileCode, Settings, FileText, FileImage, Terminal, File } from '@lucide/svelte';
 
   let { value, onSelect, onClose } = $props();
 
@@ -177,28 +178,24 @@
   }
 
   function entryIcon(entry) {
-    if (entry.is_dir) return entry.name === '..' ? '🔙' : '📁';
+    if (entry.is_dir) return entry.name === '..' ? CornerUpLeft : Folder;
     const ext = entry.name.split('.').pop().toLowerCase();
-    const icons = {
-      'js': '📜', 'ts': '📘', 'jsx': '📜', 'tsx': '📘',
-      'py': '', 'go': '', 'rs': '', 'rb': '💎',
-      'java': '☕', 'c': '️', 'cpp': '⚙️', 'h': '️',
-      'json': '📋', 'yaml': '', 'yml': '📋', 'toml': '📋',
-      'md': '📝', 'txt': '', 'html': '🌐', 'css': '🎨',
-      'png': '🖼️', 'jpg': '️', 'gif': '🖼️', 'svg': '🖼️',
-      'sh': '🖥️', 'bash': '🖥️', 'zsh': '️',
-      'dockerfile': '🐳', 'makefile': '',
-    };
-    return icons[ext] || '📄';
-  }
+    const codeExts = ['js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'rb', 'java', 'c', 'cpp', 'h', 'html', 'css', 'makefile'];
+    const configExts = ['json', 'yaml', 'yml', 'toml', 'dockerfile'];
+    const textExts = ['md', 'txt'];
+    const imgExts = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
+    const scriptExts = ['sh', 'bash', 'zsh'];
 
-  function entryTypeClass(entry) {
-    if (entry.is_dir) return 'color:#135ce0';
-    return 'color:#888';
+    if (codeExts.includes(ext)) return FileCode;
+    if (configExts.includes(ext)) return Settings;
+    if (textExts.includes(ext)) return FileText;
+    if (imgExts.includes(ext)) return FileImage;
+    if (scriptExts.includes(ext)) return Terminal;
+    return File;
   }
-
+ 
   let show = $derived(showPicker || loading);
-
+ 
   // Update position on window resize, close on scroll
   $effect(() => {
     if (!showPicker) return;
@@ -212,10 +209,10 @@
       window.removeEventListener('scroll', onScroll, true);
     };
   });
-
+ 
   export { handleKeydown, show };
 </script>
-
+ 
 {#if show}
   <div
     class="path-picker fixed bg-ctp-mantle border border-ctp-surface0 rounded-lg shadow-lg overflow-hidden z-[9999] max-h-60 overflow-y-auto"
@@ -236,15 +233,18 @@
         <span>{entries.length} items</span>
       </div>
       {#each entries as entry, i}
+        {@const Icon = entryIcon(entry)}
         <button
           class="w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-ctp-surface0/70 cursor-pointer"
           class:bg-ctp-surface0={i === selectedIndex}
           onclick={() => selectEntry(entry, false)}
           onmouseenter={() => selectedIndex = i}
         >
-          <span class="text-xs shrink-0" style="font-size:12px">{entryIcon(entry)}</span>
+          <span class="text-xs shrink-0 flex items-center justify-center text-ctp-overlay1">
+            <Icon size={14} />
+          </span>
           <div class="flex-1 min-w-0">
-            <div class="text-xs font-mono text-ctp-text truncate" style="{entryTypeClass(entry)}">{entry.name}</div>
+            <div class="text-xs font-mono truncate {entry.is_dir ? 'text-ctp-blue font-semibold' : 'text-ctp-text'}">{entry.name}</div>
             {#if entry.size}
               <div class="text-[9px] text-ctp-overlay1">{Math.round(entry.size / 1024)}KB</div>
             {/if}

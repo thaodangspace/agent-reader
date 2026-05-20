@@ -1,5 +1,6 @@
 <script>
   import { searchFS, debouncedSearch } from '$lib/api/fs.js';
+  import { Folder, CornerUpLeft, FileCode, Settings, FileText, FileImage, Terminal, File } from '@lucide/svelte';
 
   let { sessionId, input, onFileSelect, onMentionClose } = $props();
 
@@ -23,21 +24,22 @@
   }
 
   function entryIcon(entry) {
-    if (entry.is_dir) return '📁';
+    if (entry.is_dir) return Folder;
     const ext = entry.name.split('.').pop().toLowerCase();
-    const icons = {
-      'js': '📜', 'ts': '📘', 'jsx': '', 'tsx': '📘',
-      'py': '🐍', 'go': '', 'rs': '🦀', 'rb': '💎',
-      'java': '☕', 'c': '⚙️', 'cpp': '⚙️', 'h': '️',
-      'json': '📋', 'yaml': '📋', 'yml': '', 'toml': '📋',
-      'md': '', 'txt': '📄', 'html': '🌐', 'css': '🎨',
-      'png': '🖼️', 'jpg': '🖼️', 'gif': '🖼️', 'svg': '🖼️',
-      'sh': '🖥️', 'bash': '🖥️', 'zsh': '️',
-      'dockerfile': '🐳', 'makefile': '',
-    };
-    return icons[ext] || '📄';
-  }
+    const codeExts = ['js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'rb', 'java', 'c', 'cpp', 'h', 'html', 'css', 'makefile'];
+    const configExts = ['json', 'yaml', 'yml', 'toml', 'dockerfile'];
+    const textExts = ['md', 'txt'];
+    const imgExts = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
+    const scriptExts = ['sh', 'bash', 'zsh'];
 
+    if (codeExts.includes(ext)) return FileCode;
+    if (configExts.includes(ext)) return Settings;
+    if (textExts.includes(ext)) return FileText;
+    if (imgExts.includes(ext)) return FileImage;
+    if (scriptExts.includes(ext)) return Terminal;
+    return File;
+  }
+ 
   $effect(() => {
     const _ = input;
     const query = getMentionQuery();
@@ -59,23 +61,23 @@
       selectedIndex = 0;
     });
   });
-
+ 
   let show = $derived(entries.length > 0 || loading);
-
+ 
   function selectEntry(entry) {
     onFileSelect(entry);
   }
-
+ 
   function navigateUp() {
     if (entries.length === 0) return;
     selectedIndex = (selectedIndex - 1 + entries.length) % entries.length;
   }
-
+ 
   function navigateDown() {
     if (entries.length === 0) return;
     selectedIndex = (selectedIndex + 1) % entries.length;
   }
-
+ 
   function handleKeydown(e) {
     if (!show) return false;
     if (e.key === 'ArrowDown') {
@@ -95,10 +97,10 @@
     }
     return false;
   }
-
+ 
   export { handleKeydown, show };
 </script>
-
+ 
 {#if show}
   <div
     class="file-mention-palette absolute bottom-full left-0 right-0 mb-1 bg-ctp-mantle border border-ctp-surface0 rounded-lg shadow-lg overflow-hidden z-50 max-h-60 overflow-y-auto"
@@ -118,13 +120,16 @@
         <span>{entries.length} found</span>
       </div>
       {#each entries as entry, i}
+        {@const Icon = entryIcon(entry)}
         <button
           class="w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-ctp-surface0/70 cursor-pointer"
           class:bg-ctp-surface0={i === selectedIndex}
           onclick={() => selectEntry(entry)}
           onmouseenter={() => selectedIndex = i}
         >
-          <span class="text-xs shrink-0" style="font-size:12px">{entryIcon(entry)}</span>
+          <span class="text-xs shrink-0 flex items-center justify-center text-ctp-overlay1">
+            <Icon size={14} />
+          </span>
           <div class="flex-1 min-w-0">
             <div class="text-xs font-mono text-ctp-text truncate">{escapeHTML(entry.name)}</div>
             <div class="text-[9px] text-ctp-overlay1 truncate">{escapeHTML(entry.path)}</div>

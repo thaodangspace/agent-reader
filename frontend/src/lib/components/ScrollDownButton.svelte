@@ -1,5 +1,6 @@
 <script>
   import { newMessageCount } from '$lib/stores/messages.svelte.js';
+  import { ArrowDown } from '@lucide/svelte';
 
   let { onScrollToBottom } = $props();
 </script>
@@ -9,7 +10,7 @@
   style="background:color-mix(in srgb, #135ce0 10%, #ffffff); color:#333333; border:1px solid #135ce0;"
   onclick={onScrollToBottom}
 >
-  <span>↓</span>
+  <ArrowDown size={14} />
   {#if $newMessageCount > 0}
     <span>New {$newMessageCount} message{($newMessageCount > 1) ? 's' : ''}</span>
   {:else}

@@ -7,6 +7,7 @@
   import { createSession, fetchSessions } from '$lib/api/sessions.js';
   import { selectSession } from '$lib/actions/session.js';
   import { formatTokens } from '$lib/utils/format.js';
+  import { Menu, Plus } from '@lucide/svelte';
 
   let sessionInfo = $state(null);
   let creating = $state(false);
@@ -105,12 +106,17 @@
 
   {#if sessionInfo?.cwd}
     <button
-      class="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-ctp-green/12 text-ctp-green hover:bg-ctp-green/20 transition-colors"
+      class="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-ctp-green/12 text-ctp-green hover:bg-ctp-green/20 transition-colors inline-flex items-center gap-1"
       disabled={creating}
       onclick={handleNewSession}
       title="New session in {sessionInfo.cwd}"
     >
-      {creating ? '...' : '+ New'}
+      {#if creating}
+        <span>...</span>
+      {:else}
+        <Plus size={11} />
+        <span>New</span>
+      {/if}
     </button>
   {/if}
 
@@ -128,8 +134,6 @@
     class="md:hidden absolute top-2.5 left-2.5 z-[60] p-1.5 rounded-md bg-ctp-crust text-ctp-text hover:bg-ctp-surface0"
     onclick={() => sidebarOpen.update(v => !v)}
   >
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-    </svg>
+    <Menu class="h-4 w-4" />
   </button>
 </div>

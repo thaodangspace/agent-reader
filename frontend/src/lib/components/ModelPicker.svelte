@@ -2,6 +2,7 @@
   import { getAvailableModels, setModel, cycleModel } from '$lib/api/rpc.js';
   import { availableModels, setModelsForSession, clearModelsForSession } from '$lib/stores/models.svelte.js';
   import { rpcRunning, isRpcRunning } from '$lib/stores/rpc.svelte.js';
+  import { ChevronDown, Check, RefreshCw } from '@lucide/svelte';
 
   let { sessionId, currentModel } = $props();
 
@@ -177,12 +178,10 @@
     <span class="w-3 h-3 border border-ctp-blue border-t-transparent rounded-full animate-spin"></span>
   {:else}
     {currentModel ? escapeHTML(currentModel) : 'no model'}
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-    </svg>
+    <ChevronDown class="w-3 h-3" />
   {/if}
 </button>
-
+ 
 {#if showDropdown}
   <!-- Dropdown panel — fixed position to avoid clipping -->
   <div
@@ -195,16 +194,21 @@
       <span class="text-[11px] font-semibold text-ctp-overlay0">Switch Model</span>
       {#if models.length > 1}
         <button
-          class="text-[11px] text-ctp-blue hover:text-ctp-blue/80 cursor-pointer px-2 py-0.5 rounded hover:bg-ctp-blue/10 transition-colors"
+          class="text-[11px] text-ctp-blue hover:text-ctp-blue/80 cursor-pointer px-2 py-0.5 rounded hover:bg-ctp-blue/10 transition-colors inline-flex items-center gap-1"
           disabled={!rpcActive || switching}
           onclick={handleCycle}
           title="Cycle to next model"
         >
-          {switching ? '...' : '↻ Cycle'}
+          {#if switching}
+            <span>...</span>
+          {:else}
+            <RefreshCw size={11} />
+            <span>Cycle</span>
+          {/if}
         </button>
       {/if}
     </div>
-
+ 
     <!-- RPC not running warning -->
     {#if !rpcActive}
       <div class="px-4 py-4 text-center">
@@ -232,9 +236,9 @@
             disabled={switching || isCurrentModel(m)}
             onclick={() => selectModel(m)}
           >
-            <span class="w-4 shrink-0 text-center text-xs">
+            <span class="w-4 shrink-0 text-center text-xs flex items-center justify-center">
               {#if isCurrentModel(m)}
-                <span class="text-ctp-green">✓</span>
+                <Check class="w-3 h-3 text-ctp-green" />
               {:else}
                 <span class="text-ctp-overlay0 opacity-30">○</span>
               {/if}

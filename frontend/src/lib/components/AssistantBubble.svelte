@@ -5,6 +5,7 @@
   import ThinkingBlock from './ThinkingBlock.svelte';
   import ToolCallBlock from './ToolCallBlock.svelte';
   import ImageViewer from './ImageViewer.svelte';
+  import { ChevronRight, ChevronDown, Wrench } from '@lucide/svelte';
 
   let { msg } = $props();
 
@@ -153,12 +154,15 @@
           class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer"
           onclick={() => toolsCollapsed = !toolsCollapsed}
         >
-          <span
-            class="transition-transform duration-200 text-[10px]"
-            style="transform: {toolsCollapsed ? '' : 'rotate(90deg)'}"
-          >▶</span>
-          <span>🛠️</span>
-          <span class="font-semibold" style="color:var(--color-ctp-blue)">Tools</span>
+          <span class="flex items-center">
+            {#if toolsCollapsed}
+              <ChevronRight size={12} />
+            {:else}
+              <ChevronDown size={12} />
+            {/if}
+          </span>
+          <Wrench size={14} class="text-ctp-blue" />
+          <span class="font-semibold text-ctp-blue">Tools</span>
           <span class="text-ctp-overlay0 text-[10px] ml-auto">{toolCalls.length} tool{toolCalls.length > 1 ? 's' : ''}</span>
         </button>
         <div class="border-t border-ctp-surface0 px-2 pt-2" class:hidden={toolsCollapsed}>

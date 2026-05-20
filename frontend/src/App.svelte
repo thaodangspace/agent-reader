@@ -6,7 +6,7 @@
   import { activeSession, sessions } from '$lib/stores/session.svelte.js';
   import { userScrolledUp, newMessageCount } from '$lib/stores/messages.svelte.js';
   import { setRpcRunning } from '$lib/stores/rpc.svelte.js';
-  import { sidebarOpen, newSessionModalOpen } from '$lib/stores/ui.svelte.js';
+  import { sidebarOpen, newSessionModalOpen, sortBy, groupByProject } from '$lib/stores/ui.svelte.js';
   import { ws } from '$lib/stores/ws.svelte.js';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import HeaderBar from '$lib/components/HeaderBar.svelte';
@@ -28,10 +28,25 @@
     // Connect WebSocket
     connectWS();
 
-    // Fetch initial session list
-    fetchSessions()
-      .then(list => sessions.set(list))
-      .catch(e => console.error('Failed to fetch sessions:', e));
+    // Subscribe to sortBy and groupByProject to reactively fetch sessions
+    let currentSortBy = 'last_updated';
+    let currentGroupBy = false;
+
+    function refreshSessions() {
+      fetchSessions(currentSortBy, currentGroupBy)
+        .then(list => sessions.set(list))
+        .catch(e => console.error('Failed to fetch sessions:', e));
+    }
+
+    const unsubscribeSort = sortBy.subscribe(value => {
+      currentSortBy = value;
+      refreshSessions();
+    });
+
+    const unsubscribeGroup = groupByProject.subscribe(value => {
+      currentGroupBy = value;
+      refreshSessions();
+    });
 
     // Sync RPC status from server (restores state after page reload)
     getRPCStatus()
@@ -67,7 +82,7 @@
 
     // Refresh sessions periodically
     const interval = setInterval(() => {
-      fetchSessions()
+      fetchSessions(currentSortBy, currentGroupBy)
         .then(list => sessions.set(list))
         .catch(() => {});
     }, 5000);
@@ -75,6 +90,8 @@
     return () => {
       clearInterval(interval);
       window.removeEventListener('resize', handleResize);
+      unsubscribeSort();
+      unsubscribeGroup();
     };
   });
 

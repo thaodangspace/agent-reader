@@ -1,14 +1,37 @@
 <script>
   import { sessions, activeSession } from '$lib/stores/session.svelte.js';
-  import { sidebarOpen, groupByProject } from '$lib/stores/ui.svelte.js';
+  import { sidebarOpen, groupByProject, sortBy } from '$lib/stores/ui.svelte.js';
   import { selectSession } from '$lib/actions/session.js';
+  import { Zap, FolderOpen, List, Clock, Type, Plus, X, ChevronDown, ChevronRight } from '@lucide/svelte';
 
   let { onNewSession } = $props();
 
-  // Expanded project groups state
   let expandedProjects = $state({});
+  let projectSessionLimits = $state({});
 
-  // Computed grouped sessions: sorted alphabetically by cwd, sessions within sorted by timestamp (newest first)
+  const getProjectLimit = (cwd) => projectSessionLimits[cwd] || 20;
+
+  function loadMoreSessions(cwd) {
+    projectSessionLimits[cwd] = getProjectLimit(cwd) + 20;
+  }
+
+  // Computed sorted flat sessions list
+  let sortedSessions = $derived.by(() => {
+    const list = [...$sessions];
+    if ($sortBy === 'alphabetical') {
+      list.sort((a, b) => {
+        const nameA = a.project || a.cwd || '';
+        const nameB = b.project || b.cwd || '';
+        return nameA.localeCompare(nameB);
+      });
+    } else {
+      // 'last_updated'
+      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
+    return list;
+  });
+
+  // Computed grouped sessions: sorted by last updated or alphabetically, sessions within sorted by timestamp (newest first)
   let groupedSessions = $derived.by(() => {
     const list = $sessions;
     const groups = {};
@@ -19,12 +42,24 @@
       }
       groups[key].push(session);
     }
-    return Object.keys(groups)
-      .sort()
-      .map(cwd => ({
+
+    const mapped = Object.keys(groups).map(cwd => {
+      const sorted = groups[cwd].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      return {
         cwd,
-        sessions: groups[cwd].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      }));
+        sessions: sorted,
+        newestTimestamp: sorted.length > 0 ? new Date(sorted[0].timestamp) : new Date(0)
+      };
+    });
+
+    if ($sortBy === 'alphabetical') {
+      mapped.sort((a, b) => a.cwd.localeCompare(b.cwd));
+    } else {
+      // 'last_updated'
+      mapped.sort((a, b) => b.newestTimestamp - a.newestTimestamp);
+    }
+
+    return mapped;
   });
 
   // Auto-expand group containing active session
@@ -73,22 +108,43 @@
 
 <div class="w-[280px] h-full bg-ctp-mantle border-r border-ctp-surface0 flex flex-col">
   <div class="p-4 border-b border-ctp-surface0 text-sm font-semibold text-ctp-blue flex items-center justify-between" style="background:color-mix(in srgb, #135ce0 4%, #ffffff)">
-    <span>⚡ Sessions</span>
-    <div class="flex items-center gap-2">
+    <span class="flex items-center gap-1.5"><Zap size={14} /> Sessions</span>
+    <div class="flex items-center gap-1">
       <button
-        class="text-ctp-green hover:text-ctp-teal text-xs font-bold"
+        class="text-ctp-green hover:text-ctp-teal flex items-center justify-center p-1 rounded hover:bg-ctp-surface0/50 cursor-pointer"
         onclick={() => groupByProject.update(v => !v)}
         title={$groupByProject ? "Switch to flat list" : "Group by project"}
-      >{$groupByProject ? '📁' : '≡'}</button>
+      >
+        {#if $groupByProject}
+          <List size={14} />
+        {:else}
+          <FolderOpen size={14} />
+        {/if}
+      </button>
       <button
-        class="text-ctp-green hover:text-ctp-teal text-xs font-bold"
+        class="text-ctp-green hover:text-ctp-teal flex items-center justify-center p-1 rounded hover:bg-ctp-surface0/50 cursor-pointer"
+        onclick={() => sortBy.update(s => s === 'last_updated' ? 'alphabetical' : 'last_updated')}
+        title={$sortBy === 'last_updated' ? "Sort: Last Updated" : "Sort: A-Z"}
+      >
+        {#if $sortBy === 'last_updated'}
+          <Clock size={14} />
+        {:else}
+          <Type size={14} />
+        {/if}
+      </button>
+      <button
+        class="text-ctp-green hover:text-ctp-teal flex items-center justify-center p-1 rounded hover:bg-ctp-surface0/50 cursor-pointer"
         onclick={onNewSession}
         title="New Session"
-      >＋</button>
+      >
+        <Plus size={14} />
+      </button>
       <button
-        class="md:hidden text-ctp-overlay0 hover:text-ctp-text"
+        class="md:hidden text-ctp-overlay0 hover:text-ctp-text flex items-center justify-center p-1 rounded hover:bg-ctp-surface0/50 cursor-pointer"
         onclick={() => sidebarOpen.set(false)}
-      >✕</button>
+      >
+        <X size={14} />
+      </button>
     </div>
   </div>
 
@@ -106,18 +162,32 @@
             onclick={() => toggleProjectGroup(cwd)}
           >
             <span class="truncate">{cwd} ({cwdSessions.length})</span>
-            <span class="ml-2 flex-shrink-0">{expandedProjects[cwd] ? '▼' : '▶'}</span>
+            <span class="ml-2 flex-shrink-0 flex items-center">
+              {#if expandedProjects[cwd]}
+                <ChevronDown size={14} />
+              {:else}
+                <ChevronRight size={14} />
+              {/if}
+            </span>
           </button>
           {#if expandedProjects[cwd]}
-            {#each cwdSessions as session (session.id)}
+            {#each cwdSessions.slice(0, getProjectLimit(cwd)) as session (session.id)}
               {@render sessionItem(session)}
             {/each}
+            {#if cwdSessions.length > getProjectLimit(cwd)}
+              <button
+                class="w-full text-center py-2 text-[11px] text-ctp-blue hover:bg-ctp-surface1 cursor-pointer transition-colors duration-150 border-b border-ctp-surface0 font-medium"
+                onclick={() => loadMoreSessions(cwd)}
+              >
+                Load More ({cwdSessions.length - getProjectLimit(cwd)} remaining)
+              </button>
+            {/if}
           {/if}
         </div>
       {/each}
     {:else}
       <!-- Flat list -->
-      {#each $sessions as session (session.id)}
+      {#each sortedSessions as session (session.id)}
         {@render sessionItem(session)}
       {/each}
     {/if}

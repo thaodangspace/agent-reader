@@ -233,19 +233,127 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessions := s.listSessions()
-	total := len(sessions)
 
-	// Paginate: 100 sessions per page
-	const pageSize = 100
-	offset := (page - 1) * pageSize
-	if offset >= total {
-		sessions = []SessionInfo{}
-	} else {
-		end := offset + pageSize
-		if end > total {
-			end = total
+	// Parse parameters
+	groupBy := r.URL.Query().Get("group_by")
+	sortBy := r.URL.Query().Get("sort")
+
+	var total int
+
+	if groupBy == "project" {
+		// Group sessions by project
+		groups := make(map[string][]SessionInfo)
+		for _, sess := range sessions {
+			key := sess.Project
+			if key == "" {
+				key = sess.CWD
+			}
+			if key == "" {
+				key = "unknown"
+			}
+			groups[key] = append(groups[key], sess)
 		}
-		sessions = sessions[offset:end]
+
+		// Always sort sessions within each project group by timestamp descending
+		for key := range groups {
+			sort.Slice(groups[key], func(i, j int) bool {
+				return groups[key][i].Timestamp.After(groups[key][j].Timestamp)
+			})
+		}
+
+		// Create a list of project keys
+		type projectMeta struct {
+			key             string
+			newestTimestamp time.Time
+		}
+		var projects []projectMeta
+		for key, list := range groups {
+			newest := time.Time{}
+			if len(list) > 0 {
+				newest = list[0].Timestamp
+			}
+			projects = append(projects, projectMeta{
+				key:             key,
+				newestTimestamp: newest,
+			})
+		}
+
+		// Sort the projects
+		if sortBy == "alphabetical" {
+			sort.Slice(projects, func(i, j int) bool {
+				return strings.ToLower(projects[i].key) < strings.ToLower(projects[j].key)
+			})
+		} else {
+			// default to last_updated
+			sort.Slice(projects, func(i, j int) bool {
+				return projects[i].newestTimestamp.After(projects[j].newestTimestamp)
+			})
+		}
+
+		total = len(projects)
+
+		// Paginate projects: 50 projects per page
+		const projectPageSize = 50
+		offset := (page - 1) * projectPageSize
+		var paginatedProjects []projectMeta
+		if offset < total {
+			end := offset + projectPageSize
+			if end > total {
+				end = total
+			}
+			paginatedProjects = projects[offset:end]
+		}
+
+		// Collect all sessions for the paginated projects
+		var resultSessions []SessionInfo
+		for _, p := range paginatedProjects {
+			resultSessions = append(resultSessions, groups[p.key]...)
+		}
+		sessions = resultSessions
+
+	} else {
+		// Flat pagination
+		// Sort based on "sort" parameter
+		if sortBy == "alphabetical" {
+			sort.Slice(sessions, func(i, j int) bool {
+				pI := sessions[i].Project
+				if pI == "" {
+					pI = sessions[i].CWD
+				}
+				pI = strings.ToLower(pI)
+
+				pJ := sessions[j].Project
+				if pJ == "" {
+					pJ = sessions[j].CWD
+				}
+				pJ = strings.ToLower(pJ)
+
+				if pI != pJ {
+					return pI < pJ
+				}
+				return sessions[i].Timestamp.After(sessions[j].Timestamp)
+			})
+		} else {
+			// Default to last_updated
+			sort.Slice(sessions, func(i, j int) bool {
+				return sessions[i].Timestamp.After(sessions[j].Timestamp)
+			})
+		}
+
+		total = len(sessions)
+
+		// Paginate: 100 sessions per page
+		const pageSize = 100
+		offset := (page - 1) * pageSize
+		if offset >= total {
+			sessions = []SessionInfo{}
+		} else {
+			end := offset + pageSize
+			if end > total {
+				end = total
+			}
+			sessions = sessions[offset:end]
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

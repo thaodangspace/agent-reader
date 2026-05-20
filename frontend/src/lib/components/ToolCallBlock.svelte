@@ -3,6 +3,7 @@
   import { detectLanguageFromPath } from '$lib/utils/language.js';
   import { unescapeJsonString } from '$lib/utils/json.js';
   import DiffView from './DiffView.svelte';
+  import { ChevronRight, ChevronDown, FileText, BookOpen, Terminal, Wrench } from '@lucide/svelte';
 
   let { tc } = $props();
   let collapsed = $state(true);
@@ -57,8 +58,14 @@
 {:else if isWriteTool}
   <div class="rounded-lg overflow-hidden border border-ctp-surface0 mb-2" style="background:color-mix(in srgb, #135ce0 8%, #f6f6f6)">
     <button class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer" onclick={toggle}>
-      <span class="transition-transform duration-200 text-[10px]" style="transform: {collapsed ? '' : 'rotate(90deg)'}">▶</span>
-      <span>📄</span>
+      <span class="flex items-center">
+        {#if collapsed}
+          <ChevronRight size={12} />
+        {:else}
+          <ChevronDown size={12} />
+        {/if}
+      </span>
+      <FileText size={14} class="text-ctp-blue" />
       <span class="font-semibold" style="color:#135ce0">write</span>
       <span class="text-ctp-overlay0 text-[10px] ml-auto truncate max-w-[300px]" title={writePath}>{writePath.split('/').slice(-2).join('/')}</span>
     </button>
@@ -74,13 +81,19 @@
   <div class="rounded-lg overflow-hidden border border-ctp-surface0 mb-2"
        style="background: {hasResult && resultIsError ? 'color-mix(in srgb, #e95f59 8%, #ffffff)' : 'color-mix(in srgb, #135ce0 6%, #ffffff)'}">
     <button class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer" onclick={toggle}>
-      <span class="transition-transform duration-200 text-[10px]" style="transform: {collapsed ? '' : 'rotate(90deg)'}">▶</span>
+      <span class="flex items-center">
+        {#if collapsed}
+          <ChevronRight size={12} />
+        {:else}
+          <ChevronDown size={12} />
+        {/if}
+      </span>
       {#if tc.name === 'read'}
-        <span>📖</span>
+        <BookOpen size={14} class="text-ctp-blue" />
       {:else if tc.name === 'bash'}
-        <span>⚡</span>
+        <Terminal size={14} class="text-ctp-blue" />
       {:else}
-        <span>🔧</span>
+        <Wrench size={14} class="text-ctp-blue" />
       {/if}
       <span class="font-semibold" style="color:#135ce0">{escapeHTML(tc.name)}</span>
       {#if parsedArgs?.path}

@@ -1,5 +1,5 @@
-export async function fetchSessions() {
-  const res = await fetch('/api/sessions?page=1');
+export async function fetchSessions(sortBy = 'last_updated', groupBy = false) {
+  const res = await fetch(`/api/sessions?page=1&sort=${sortBy}&group_by=${groupBy ? 'project' : ''}`);
   if (!res.ok) throw new Error('Failed to fetch sessions');
   const data = await res.json();
   return data.sessions;

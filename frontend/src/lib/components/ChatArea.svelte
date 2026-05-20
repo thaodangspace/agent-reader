@@ -5,6 +5,7 @@
   import { activeSession } from '$lib/stores/session.svelte.js';
   import { userScrolledUp, newMessageCount } from '$lib/stores/messages.svelte.js';
   import { sendMessage, abortRPC, ensureRpcRunning } from '$lib/actions/rpc.js';
+  import { MessageSquare, Lightbulb, Wrench, Image, X, Paperclip, ChevronUp, RefreshCw, Check } from '@lucide/svelte';
 
   import MessageBubble from './MessageBubble.svelte';
   import AssistantBubble from './AssistantBubble.svelte';
@@ -551,9 +552,7 @@
           <!-- Icon -->
           <div class="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                style="background: linear-gradient(135deg, color-mix(in srgb, #135ce0 12%, #ffffff), color-mix(in srgb, #036aca 12%, #ffffff))">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-ctp-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-            </svg>
+            <MessageSquare class="w-8 h-8 text-ctp-blue" strokeWidth={1.5} />
           </div>
           <h2 class="text-lg font-semibold text-ctp-text mb-1">
             {$activeSession ? 'Ready to chat' : 'Select a session to begin'}
@@ -563,14 +562,14 @@
           </p>
           {#if $activeSession}
             <div class="flex flex-wrap gap-2 justify-center">
-              <span class="text-[10px] px-2.5 py-1 rounded-full" style="background:color-mix(in srgb, #135ce0 10%, transparent); color:#135ce0">
-                💡 Ask a question
+              <span class="text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1" style="background:color-mix(in srgb, #135ce0 10%, transparent); color:#135ce0">
+                <Lightbulb size={11} /> Ask a question
               </span>
-              <span class="text-[10px] px-2.5 py-1 rounded-full" style="background:color-mix(in srgb, #65b73b 10%, transparent); color:#65b73b">
-                🛠 Run commands
+              <span class="text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1" style="background:color-mix(in srgb, #65b73b 10%, transparent); color:#65b73b">
+                <Wrench size={11} /> Run commands
               </span>
-              <span class="text-[10px] px-2.5 py-1 rounded-full" style="background:color-mix(in srgb, #dbab09 12%, transparent); color:#b08800">
-                📎 Attach images
+              <span class="text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1" style="background:color-mix(in srgb, #dbab09 12%, transparent); color:#b08800">
+                <Image size={11} /> Attach images
               </span>
             </div>
           {/if}
@@ -665,10 +664,10 @@
                 </div>
               {/if}
               <button
-                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-ctp-red text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-ctp-red text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 onclick={() => removeImage(i)}
               >
-                ✕
+                <X size={10} />
               </button>
             </div>
           {/each}
@@ -713,14 +712,12 @@
             onpaste={handlePaste}
           ></textarea>
           <button
-            class="absolute right-2 bottom-3 p-1.5 text-ctp-overlay1 hover:text-ctp-blue hover:bg-ctp-crust/50 rounded-lg transition-all"
+            class="absolute right-2 bottom-3 p-1.5 text-ctp-overlay1 hover:text-ctp-blue hover:bg-ctp-crust/50 rounded-lg transition-all flex items-center justify-center cursor-pointer"
             onclick={() => fileInputEl?.click()}
             title="Attach image"
             disabled={$activeSession === null}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-            </svg>
+            <Paperclip size={16} />
           </button>
         </div>
         <button
@@ -757,12 +754,10 @@
               {models.find(m => isCurrentModel(m))?.provider?.[0]?.toUpperCase() || '?'}
             </span>
             <span class="truncate max-w-[180px]">{currentModel || 'Select model'}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-            </svg>
+            <ChevronUp class="w-3 h-3 shrink-0" />
           {/if}
         </button>
-
+ 
         <!-- Status info -->
         <div class="flex items-center gap-2">
           <div class="flex items-center gap-1.5 text-[10px] text-ctp-overlay1">
@@ -785,7 +780,7 @@
         </div>
       </div>
     </div>
-
+ 
     <!-- Model Dropdown Panel - positioned above the model button -->
     {#if showModelPicker}
       <div
@@ -798,16 +793,21 @@
           <span class="text-[11px] font-semibold text-ctp-overlay0">Switch Model</span>
           {#if models.length > 1}
             <button
-              class="text-[11px] text-ctp-blue hover:text-ctp-blue/80 cursor-pointer px-2 py-0.5 rounded hover:bg-ctp-blue/10 transition-colors"
+              class="text-[11px] text-ctp-blue hover:text-ctp-blue/80 cursor-pointer px-2 py-0.5 rounded hover:bg-ctp-blue/10 transition-colors inline-flex items-center gap-1"
               disabled={switchingModel}
               onclick={(e) => { e.stopPropagation(); handleCycleModel(); }}
               title="Cycle to next model"
             >
-              {switchingModel ? '...' : '↻ Cycle'}
+              {#if switchingModel}
+                <span>...</span>
+              {:else}
+                <RefreshCw size={11} />
+                <span>Cycle</span>
+              {/if}
             </button>
           {/if}
         </div>
-
+ 
         {#if $rpcAutoStarting || modelsLoading}
           <div class="px-4 py-6 text-center text-[11px] text-ctp-overlay0">
             <div class="w-4 h-4 border-2 border-ctp-blue border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -825,9 +825,9 @@
                 disabled={switchingModel || isCurrentModel(m)}
                 onclick={() => selectModel(m)}
               >
-                <span class="w-4 shrink-0 text-center text-xs">
+                <span class="w-4 shrink-0 text-center text-xs flex items-center justify-center">
                   {#if isCurrentModel(m)}
-                    <span class="text-ctp-green">✓</span>
+                    <Check class="w-3 h-3 text-ctp-green" />
                   {:else}
                     <span class="text-ctp-overlay0 opacity-30">○</span>
                   {/if}

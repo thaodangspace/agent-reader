@@ -1,5 +1,6 @@
 <script>
   import { escapeHTML } from '$lib/utils/markdown.js';
+  import { ChevronRight, ChevronDown, Brain } from '@lucide/svelte';
 
   let { content } = $props();
   let collapsed = $state(true);
@@ -17,11 +18,14 @@
     class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer"
     onclick={toggle}
   >
-    <span
-      class="transition-transform duration-200 text-[10px]"
-      style="transform: {collapsed ? '' : 'rotate(90deg)'}"
-    >▶</span>
-    <span>💭</span>
+    <span class="flex items-center">
+      {#if collapsed}
+        <ChevronRight size={12} />
+      {:else}
+        <ChevronDown size={12} />
+      {/if}
+    </span>
+    <Brain size={14} class="text-ctp-blue" />
     <span class="font-semibold text-ctp-blue">Thinking</span>
     <span class="text-ctp-overlay0 text-[10px] ml-auto">{escapeHTML(content.substring(0, 60))}…</span>
   </button>

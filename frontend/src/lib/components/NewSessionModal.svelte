@@ -3,6 +3,7 @@
   import { createSession, fetchSessions } from '$lib/api/sessions.js';
   import { selectSession } from '$lib/actions/session.js';
   import PathPicker from './PathPicker.svelte';
+  import { Zap, X, AlertCircle } from '@lucide/svelte';
 
   let cwd = $state('');
   let error = $state('');
@@ -69,8 +70,8 @@
       <div class="px-6 pt-5 pb-4 border-b border-ctp-surface0">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-ctp-blue/20 flex items-center justify-center">
-              <span class="text-sm">⚡</span>
+            <div class="w-8 h-8 rounded-lg bg-ctp-blue/20 flex items-center justify-center text-ctp-blue">
+              <Zap size={16} />
             </div>
             <div>
               <h3 class="text-sm font-semibold text-ctp-text">New Session</h3>
@@ -78,12 +79,10 @@
             </div>
           </div>
           <button
-            class="text-ctp-overlay0 hover:text-ctp-text transition-colors p-1 rounded-md hover:bg-ctp-surface0"
+            class="text-ctp-overlay0 hover:text-ctp-text transition-colors p-1 rounded-md hover:bg-ctp-surface0 flex items-center justify-center cursor-pointer"
             onclick={close}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <X class="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -133,7 +132,7 @@
             class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-ctp-red"
             style="background:color-mix(in srgb, #e95f59 10%, #ffffff)"
           >
-            <span>⚠️</span>
+            <AlertCircle size={14} class="shrink-0" />
             <span>{error}</span>
           </div>
         </div>
