@@ -1530,12 +1530,11 @@ func (s *Server) listSessions() []SessionInfo {
 			}
 
 			info := SessionInfo{
-				ID:      meta.ID,
-				File:    path,
-				Agent:   "codex",
-				CWD:     meta.CWD,
-				Project: filepath.Base(meta.CWD),
-				Model:   meta.Model,
+				ID:    meta.ID,
+				File:  path,
+				Agent: "codex",
+				CWD:   meta.CWD,
+				Model: meta.Model,
 			}
 
 			info.LineCount, info.CWD, info.Model, info.InputTokens, info.OutputTokens, info.TotalTokens, info.TotalCost, info.ContextWindow = aggregateSessionData(path, "codex")
@@ -1545,12 +1544,10 @@ func (s *Server) listSessions() []SessionInfo {
 			if info.Model == "" {
 				info.Model = meta.Model
 			}
-			if info.Project == "." || info.Project == "" {
-				if info.CWD != "" {
-					info.Project = filepath.Base(info.CWD)
-				} else {
-					info.Project = filepath.Base(filepath.Dir(path))
-				}
+			if info.CWD != "" {
+				info.Project = filepath.Base(info.CWD)
+			} else {
+				info.Project = filepath.Base(filepath.Dir(path))
 			}
 			info.FirstUserMessage = getFirstUserMessage(path, "codex")
 			info.LastMessageTime = getLastMessageTime(path)
@@ -1578,25 +1575,47 @@ func countLinesAndCWD(path string) (int, string, string) {
 }
 
 func readCodexSessionInfo(path string) (jsonl.CodexSessionMeta, bool) {
+	var found jsonl.CodexSessionMeta
+	ok := false
+	scanCodexLines(path, func(line []byte) bool {
+		meta, parsed := jsonl.ParseCodexSessionMeta(line)
+		if !parsed {
+			return true
+		}
+		if jsonl.IsCodexUserSession(meta) {
+			found = meta
+			ok = true
+		}
+		return false
+	})
+
+	return found, ok
+}
+
+func scanCodexLines(path string, visit func([]byte) bool) {
 	f, err := os.Open(path)
 	if err != nil {
-		return jsonl.CodexSessionMeta{}, false
+		return
 	}
 	defer f.Close()
 
-	scanner := NewLineScanner(f, make([]byte, 32*1024))
-	for scanner.Scan() {
-		meta, ok := jsonl.ParseCodexSessionMeta(scanner.Bytes())
-		if !ok {
-			continue
+	reader := bufio.NewReaderSize(f, 2*1024*1024)
+	for {
+		line, err := reader.ReadBytes('\n')
+		if len(line) > 0 {
+			line = bytesTrimRightNewline(line)
+			if !visit(line) {
+				return
+			}
 		}
-		if jsonl.IsCodexUserSession(meta) {
-			return meta, true
+		if err != nil {
+			return
 		}
-		return jsonl.CodexSessionMeta{}, false
 	}
+}
 
-	return jsonl.CodexSessionMeta{}, false
+func bytesTrimRightNewline(line []byte) []byte {
+	return []byte(strings.TrimRight(string(line), "\r\n"))
 }
 
 // getContextWindow returns the context window size for a given model ID.
@@ -1673,6 +1692,10 @@ func getContextWindow(model string) int64 {
 // aggregateSessionData reads the JSONL file and aggregates all session metadata.
 // The agent parameter distinguishes between "pi" and "claude" formats.
 func aggregateSessionData(path string, agent string) (lineCount int, cwd string, model string, inputTokens, outputTokens, totalTokens int64, totalCost float64, contextWindow int64) {
+	if agent == "codex" {
+		return aggregateCodexSessionData(path)
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, "", "", 0, 0, 0, 0, 0
@@ -1686,40 +1709,6 @@ func aggregateSessionData(path string, agent string) (lineCount int, cwd string,
 	for scanner.Scan() {
 		count++
 		line := scanner.Bytes()
-
-		if agent == "codex" {
-			if meta, ok := jsonl.ParseCodexSessionMeta(line); ok {
-				if cwd == "" {
-					cwd = meta.CWD
-				}
-				if model == "" {
-					model = meta.Model
-				}
-				continue
-			}
-			if model == "" {
-				var ctx struct {
-					Type    string `json:"type"`
-					Model   string `json:"model"`
-					Payload struct {
-						Type  string `json:"type"`
-						Model string `json:"model"`
-					} `json:"payload"`
-				}
-				if json.Unmarshal(line, &ctx) == nil {
-					if ctx.Type == "turn_context" {
-						if ctx.Model != "" {
-							model = ctx.Model
-						} else if ctx.Payload.Model != "" {
-							model = ctx.Payload.Model
-						}
-					} else if ctx.Type == "response_item" && ctx.Payload.Type == "turn_context" && ctx.Payload.Model != "" {
-						model = ctx.Payload.Model
-					}
-				}
-			}
-			continue
-		}
 
 		if agent == "pi" {
 			// pi-agent: cwd from first-line session event
@@ -1818,8 +1807,73 @@ func aggregateSessionData(path string, agent string) (lineCount int, cwd string,
 	return count, cwd, model, inputTokens, outputTokens, totalTokens, totalCost, contextWindow
 }
 
+func aggregateCodexSessionData(path string) (lineCount int, cwd string, model string, inputTokens, outputTokens, totalTokens int64, totalCost float64, contextWindow int64) {
+	scanCodexLines(path, func(line []byte) bool {
+		lineCount++
+		if meta, ok := jsonl.ParseCodexSessionMeta(line); ok {
+			if cwd == "" {
+				cwd = meta.CWD
+			}
+			if model == "" {
+				model = meta.Model
+			}
+			return true
+		}
+		if model == "" {
+			var ctx struct {
+				Type    string `json:"type"`
+				Model   string `json:"model"`
+				Payload struct {
+					Type  string `json:"type"`
+					Model string `json:"model"`
+				} `json:"payload"`
+			}
+			if json.Unmarshal(line, &ctx) == nil {
+				if ctx.Type == "turn_context" {
+					if ctx.Model != "" {
+						model = ctx.Model
+					} else if ctx.Payload.Model != "" {
+						model = ctx.Payload.Model
+					}
+				} else if ctx.Type == "response_item" && ctx.Payload.Type == "turn_context" && ctx.Payload.Model != "" {
+					model = ctx.Payload.Model
+				}
+			}
+		}
+		return true
+	})
+
+	contextWindow = getContextWindow(model)
+	return lineCount, cwd, model, 0, 0, 0, 0, contextWindow
+}
+
 // getFirstUserMessage reads the JSONL file and returns the text content of the first user message (truncated to 200 chars).
 func getFirstUserMessage(path string, agent string) string {
+	if agent == "codex" {
+		var first string
+		scanCodexLines(path, func(line []byte) bool {
+			var env jsonl.CodexEnvelope
+			if json.Unmarshal(line, &env) != nil || env.Type != "response_item" {
+				return true
+			}
+			var msg jsonl.CodexMessage
+			if json.Unmarshal(env.Payload, &msg) != nil || msg.Type != "message" || msg.Role != "user" {
+				return true
+			}
+			for _, block := range msg.Content {
+				if (block.Type == "input_text" || block.Type == "text") && block.Text != "" {
+					if strings.HasPrefix(strings.TrimSpace(block.Text), "<environment_context>") {
+						continue
+					}
+					first = truncateMessage(block.Text)
+					return false
+				}
+			}
+			return true
+		})
+		return first
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
@@ -1847,18 +1901,6 @@ func getFirstUserMessage(path string, agent string) string {
 				for _, block := range evt.Message.Content {
 					if block.Type == "text" && block.Text != "" {
 						return truncateMessage(block.Text)
-					}
-				}
-			}
-		} else if agent == "codex" {
-			var env jsonl.CodexEnvelope
-			if json.Unmarshal(line, &env) == nil && env.Type == "response_item" {
-				var msg jsonl.CodexMessage
-				if json.Unmarshal(env.Payload, &msg) == nil && msg.Type == "message" && msg.Role == "user" {
-					for _, block := range msg.Content {
-						if (block.Type == "input_text" || block.Type == "text") && block.Text != "" {
-							return truncateMessage(block.Text)
-						}
 					}
 				}
 			}
