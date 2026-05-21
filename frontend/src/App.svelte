@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { connectWS } from '$lib/api/websocket.js';
-  import { fetchSessions } from '$lib/api/sessions.js';
+  import { fetchSessions, fetchUnreadIds } from '$lib/api/sessions.js';
   import { getRPCStatus } from '$lib/api/rpc.js';
-  import { activeSession, sessions } from '$lib/stores/session.svelte.js';
+  import { activeSession, sessions, unreadSessionIds } from '$lib/stores/session.svelte.js';
   import { userScrolledUp, newMessageCount } from '$lib/stores/messages.svelte.js';
   import { setRpcRunning } from '$lib/stores/rpc.svelte.js';
   import { sidebarOpen, newSessionModalOpen, sortBy, groupByProject } from '$lib/stores/ui.svelte.js';
@@ -36,6 +36,10 @@
       fetchSessions(currentSortBy, currentGroupBy)
         .then(list => sessions.set(list))
         .catch(e => console.error('Failed to fetch sessions:', e));
+      // Refresh unread status
+      fetchUnreadIds()
+        .then(ids => unreadSessionIds.set(ids))
+        .catch(() => {});
     }
 
     const unsubscribeSort = sortBy.subscribe(value => {
@@ -84,6 +88,9 @@
     const interval = setInterval(() => {
       fetchSessions(currentSortBy, currentGroupBy)
         .then(list => sessions.set(list))
+        .catch(() => {});
+      fetchUnreadIds()
+        .then(ids => unreadSessionIds.set(ids))
         .catch(() => {});
     }, 5000);
 

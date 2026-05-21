@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"agent-web/internal/server"
+	"agent-reader/internal/server"
 )
 
 // loadEnv reads key=value pairs from .env file (simple format, no quotes needed).

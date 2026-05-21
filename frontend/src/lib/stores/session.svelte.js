@@ -14,6 +14,7 @@ function getInitialActiveSession() {
 export const activeSession = writable(getInitialActiveSession());
 export const activeSessionPath = writable(null);
 export const sessions = writable([]);
+export const unreadSessionIds = writable(new Set());
 
 // Persist activeSession to localStorage
 activeSession.subscribe(id => {

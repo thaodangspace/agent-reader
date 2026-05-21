@@ -20,3 +20,18 @@ export async function createSession(cwd) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function fetchUnreadIds() {
+  const res = await fetch('/api/sessions/unread');
+  if (!res.ok) throw new Error('Failed to fetch unread IDs');
+  const data = await res.json();
+  return new Set(data.unread_ids || []);
+}
+
+export async function markSessionRead(id) {
+  const res = await fetch(`/api/sessions/${id}/mark-read`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to mark session as read');
+  return res.json();
+}

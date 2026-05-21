@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"agent-web/internal/jsonl"
+	"agent-reader/internal/jsonl"
 )
 
 func TestExtractCodexMeta(t *testing.T) {

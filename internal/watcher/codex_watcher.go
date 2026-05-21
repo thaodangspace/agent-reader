@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"agent-web/internal/jsonl"
+	"agent-reader/internal/jsonl"
 
 	"github.com/fsnotify/fsnotify"
 )

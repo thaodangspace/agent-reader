@@ -1,5 +1,5 @@
 <script>
-  import { sessions, activeSession } from '$lib/stores/session.svelte.js';
+  import { sessions, activeSession, unreadSessionIds } from '$lib/stores/session.svelte.js';
   import { sidebarOpen, groupByProject, sortBy } from '$lib/stores/ui.svelte.js';
   import { selectSession } from '$lib/actions/session.js';
   import { Zap, FolderOpen, List, Clock, Type, Plus, X, ChevronDown, ChevronRight } from '@lucide/svelte';
@@ -45,9 +45,11 @@
 
     const mapped = Object.keys(groups).map(cwd => {
       const sorted = groups[cwd].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const unreadCount = sorted.filter(s => $unreadSessionIds.has(s.id)).length;
       return {
         cwd,
         sessions: sorted,
+        unreadCount,
         newestTimestamp: sorted.length > 0 ? new Date(sorted[0].timestamp) : new Date(0)
       };
     });
@@ -82,19 +84,23 @@
 
 {#snippet sessionItem(session)}
   <div
-    class="session-item px-4 py-2.5 border-b border-ctp-surface0 cursor-pointer transition-colors duration-150 hover:bg-ctp-surface1 {$activeSession === session.id ? 'bg-ctp-rosewater border-l-[3px] border-ctp-blue' : ''}"
+    class="session-item px-4 py-2.5 border-b border-ctp-surface0 cursor-pointer transition-colors duration-150 hover:bg-ctp-surface1 {$activeSession === session.id ? 'active' : ''}"
     onclick={() => selectSession(session.id)}
   >
     <div class="flex items-center justify-between">
-      <div class="text-xs text-ctp-text truncate">{session.project}</div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-[8px] h-[8px] rounded-full flex-shrink-0 {session.status === 'running' ? 'bg-ctp-green animate-pulse' : session.status === 'error' ? 'bg-ctp-red' : 'bg-ctp-overlay0'}" style="{session.status === 'running' ? 'animation-duration: 1s' : ''}"></span>
+
+        <div class="text-xs {$unreadSessionIds.has(session.id) ? 'font-bold' : 'text-ctp-text'} truncate" style={$unreadSessionIds.has(session.id) ? 'color: var(--color-ctp-maroon)' : ''}>{session.project}</div>
+      </div>
       {#if session.last_message_time}
         <div class="text-[10px] text-ctp-overlay0">{session.last_message_time}</div>
       {/if}
     </div>
     {#if session.first_user_message}
-      <div class="text-[11px] text-ctp-overlay1 truncate" title={session.first_user_message}>{session.first_user_message}</div>
+      <div class="text-[11px] {$unreadSessionIds.has(session.id) ? 'font-bold' : 'text-ctp-overlay1'} truncate" title={session.first_user_message} style={$unreadSessionIds.has(session.id) ? 'color: var(--color-ctp-maroon)' : ''}>{session.first_user_message}</div>
     {:else}
-      <div class="text-[11px] text-ctp-overlay1 break-all">{session.id}</div>
+      <div class="text-[11px] {$unreadSessionIds.has(session.id) ? 'font-bold' : 'text-ctp-overlay1'} break-all" style={$unreadSessionIds.has(session.id) ? 'color: var(--color-ctp-maroon)' : ''}>{session.id}</div>
     {/if}
     <div class="text-[10px] text-ctp-overlay0 mt-0.5">{session.cwd}</div>
     <div class="flex items-center gap-2 mt-0.5">
@@ -108,7 +114,7 @@
 
 <div class="w-[280px] h-full bg-ctp-mantle border-r border-ctp-surface0 flex flex-col">
   <div class="p-4 border-b border-ctp-surface0 text-sm font-semibold text-ctp-blue flex items-center justify-between" style="background:color-mix(in srgb, #135ce0 4%, #ffffff)">
-    <span class="flex items-center gap-1.5"><Zap size={14} /> Sessions</span>
+    <span class="flex items-center gap-1.5"><Zap size={14} /> Sessions{#if $unreadSessionIds.size > 0}<span class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-ctp-rosewater text-ctp-mantle">{$unreadSessionIds.size}</span>{/if}</span>
     <div class="flex items-center gap-1">
       <button
         class="text-ctp-green hover:text-ctp-teal flex items-center justify-center p-1 rounded hover:bg-ctp-surface0/50 cursor-pointer"
@@ -155,7 +161,7 @@
       </div>
     {:else if $groupByProject}
       <!-- Grouped by cwd -->
-      {#each groupedSessions as { cwd, sessions: cwdSessions } (cwd)}
+      {#each groupedSessions as { cwd, sessions: cwdSessions, unreadCount } (cwd)}
         <div class="project-group">
           <button
             class="w-full px-4 py-2 text-xs font-semibold text-ctp-subtext0 flex items-center justify-between hover:bg-ctp-surface1 cursor-pointer border-b border-ctp-surface0"
@@ -193,3 +199,10 @@
     {/if}
   </div>
 </div>
+
+<style>
+  .session-item.active {
+    background-color: var(--color-ctp-rosewater) !important;
+    border-left: 3px solid var(--color-ctp-red) !important;
+  }
+</style>

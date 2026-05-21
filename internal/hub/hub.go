@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"agent-web/internal/watcher"
+	"agent-reader/internal/watcher"
 
 	"github.com/gorilla/websocket"
 )

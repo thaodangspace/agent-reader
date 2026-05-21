@@ -1,7 +1,7 @@
-import { activeSession, activeSessionPath, sessions } from '$lib/stores/session.svelte.js';
+import { activeSession, activeSessionPath, sessions, unreadSessionIds } from '$lib/stores/session.svelte.js';
 import { messages, userScrolledUp, newMessageCount } from '$lib/stores/messages.svelte.js';
 import { sidebarOpen } from '$lib/stores/ui.svelte.js';
-import { fetchSession, fetchSessions } from '$lib/api/sessions.js';
+import { fetchSession, fetchSessions, markSessionRead } from '$lib/api/sessions.js';
 import { clearSeenEvents } from '$lib/utils/events.js';
 import { ws } from '$lib/stores/ws.svelte.js';
 import { stopRPC } from '$lib/api/rpc.js';
@@ -24,6 +24,13 @@ export async function selectSession(id) {
   newMessageCount.set(0);
 
   activeSession.set(id);
+
+  // Mark as read
+  markSessionRead(id).catch(() => {});
+  unreadSessionIds.update(set => {
+    set.delete(id);
+    return new Set(set);
+  });
 
   // Flush DOM updates so container is empty before replay starts
   await tick();

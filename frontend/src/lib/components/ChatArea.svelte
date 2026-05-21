@@ -563,12 +563,28 @@
             <MessageSquare class="w-8 h-8 text-ctp-blue" strokeWidth={1.5} />
           </div>
           <h2 class="text-lg font-semibold text-ctp-text mb-1">
-            {$activeSession ? 'Ready to chat' : 'Select a session to begin'}
+            {#if $activeSession}
+              {#if activeSessionCanChat}
+                Ready to chat
+              {:else}
+                Read-only session
+              {/if}
+            {:else}
+              Select a session to begin
+            {/if}
           </h2>
           <p class="text-sm text-ctp-overlay0 mb-4">
-            {$activeSession ? 'Ask anything — code, docs, debugging, or just explore ideas.' : 'Choose a session from the sidebar to view or continue.'}
+            {#if $activeSession}
+              {#if activeSessionCanChat}
+                Ask anything — code, docs, debugging, or just explore ideas.
+              {:else}
+                Browsing messages from {activeSessionInfo?.agent || 'claude'} — input is not available.
+              {/if}
+            {:else}
+              Choose a session from the sidebar to view or continue.
+            {/if}
           </p>
-          {#if $activeSession}
+          {#if $activeSession && activeSessionCanChat}
             <div class="flex flex-wrap gap-2 justify-center">
               <span class="text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1" style="background:color-mix(in srgb, #135ce0 10%, transparent); color:#135ce0">
                 <Lightbulb size={11} /> Ask a question
@@ -631,7 +647,8 @@
     <ScrollDownButton onScrollToBottom={scrollToBottomNow} />
   {/if}
 
-  <!-- Input Area -->
+  <!-- Input Area (hidden for read-only sessions: Claude / Codex) -->
+  {#if activeSessionCanChat}
   <div class="border-t border-ctp-crust bg-ctp-mantle relative w-full">
     <!-- Overlay to close model picker on click -->
     {#if showModelPicker}
@@ -872,4 +889,5 @@
       </div>
     {/if}
   </div>
+  {/if}
 </div>

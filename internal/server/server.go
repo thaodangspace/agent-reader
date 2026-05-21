@@ -20,12 +20,13 @@ import (
 	"sync"
 	"time"
 
-	"agent-web/internal/fsbrowse"
-	"agent-web/internal/hub"
-	"agent-web/internal/jsonl"
-	"agent-web/internal/llm"
-	"agent-web/internal/rpc"
-	"agent-web/internal/watcher"
+	"agent-reader/internal/fsbrowse"
+	"agent-reader/internal/hub"
+	"agent-reader/internal/jsonl"
+	"agent-reader/internal/llm"
+	"agent-reader/internal/readtracker"
+	"agent-reader/internal/rpc"
+	"agent-reader/internal/watcher"
 
 	"github.com/gorilla/websocket"
 )
@@ -78,6 +79,7 @@ type Server struct {
 	claudeWatcher     *watcher.ClaudeWatcher // Claude Code watcher (may be nil)
 	codexWatcher      *watcher.CodexWatcher  // Codex watcher (may be nil)
 	rpcMgr            *rpcManager
+	readTracker       *readtracker.ReadTracker
 	sessionsDir       string
 	claudeProjectsDir string
 	codexSessionsDir  string
@@ -94,15 +96,24 @@ func New(sessionsDir, claudeProjectsDir, codexSessionsDir, allowedRootsCSV strin
 
 	h := hub.New()
 
+	dbPath := filepath.Join(sessionsDir, "read_tracker.db")
+	rt, err := readtracker.New(dbPath, 24*time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("create read tracker: %w", err)
+	}
+
 	s := &Server{
 		hub:               h,
 		watcher:           w,
 		rpcMgr:            newRPCManager(),
+		readTracker:       rt,
 		sessionsDir:       sessionsDir,
 		claudeProjectsDir: claudeProjectsDir,
 		codexSessionsDir:  codexSessionsDir,
 		llmClient:         llm.NewLMStudioClient(),
 	}
+
+	log.Printf("[server] read tracker initialized (24h TTL) at %s", dbPath)
 
 	// Initialize filesystem browsing service if roots are configured
 	if allowedRootsCSV != "" {
@@ -153,6 +164,7 @@ func (s *Server) Start(addr string) error {
 	// REST API
 	mux.HandleFunc("/api/sessions", s.handleSessions)
 	mux.HandleFunc("/api/sessions/create", s.handleSessionCreate)
+	mux.HandleFunc("/api/sessions/unread", s.handleUnreadIDs)
 	mux.HandleFunc("/api/sessions/", s.handleSessionByID)
 
 	// RPC endpoints
@@ -227,6 +239,9 @@ func (s *Server) Stop() {
 	}
 	if s.codexWatcher != nil {
 		s.codexWatcher.Stop()
+	}
+	if s.readTracker != nil {
+		s.readTracker.Stop()
 	}
 }
 
@@ -395,6 +410,28 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Dispatch mark-read sub-route
+	if strings.HasSuffix(id, "/mark-read") {
+		markReadID := strings.TrimSuffix(id, "/mark-read")
+		if markReadID == "" {
+			http.Error(w, "missing session id", http.StatusBadRequest)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if s.readTracker != nil {
+			s.readTracker.MarkRead(markReadID)
+		}
+		log.Printf("[server] session marked as read: %s", markReadID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
 	sessions := s.listSessions()
 	var found *SessionInfo
 	for i := range sessions {
@@ -411,6 +448,31 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(found)
+}
+
+// handleUnreadIDs returns all unread session IDs.
+// GET /api/sessions/unread
+func (s *Server) handleUnreadIDs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var ids []string
+	if s.readTracker != nil {
+		sessions := s.listSessions()
+		cutoff := time.Now().Add(-24 * time.Hour)
+		for _, sess := range sessions {
+			if sess.Timestamp.After(cutoff) && s.readTracker.IsUnread(sess.ID) {
+				ids = append(ids, sess.ID)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"unread_ids": ids,
+	})
 }
 
 // handleSessionCreate creates a new session with a given cwd and starts RPC.
@@ -1444,6 +1506,9 @@ type SessionInfo struct {
 	OutputTokens     int64     `json:"output_tokens"`
 	TotalTokens      int64     `json:"total_tokens"`
 	TotalCost        float64   `json:"total_cost"`
+	IsActive         bool      `json:"is_active"`
+	Status           string    `json:"status"` // "running", "completed", "error"
+	IsUnread         bool      `json:"is_unread"`
 }
 
 // listSessions scans pi-agent, Claude Code, and Codex session directories.
@@ -1471,7 +1536,7 @@ func (s *Server) listSessions() []SessionInfo {
 
 		info.LineCount, info.CWD, info.Model, info.InputTokens, info.OutputTokens, info.TotalTokens, info.TotalCost, info.ContextWindow = aggregateSessionData(path, "pi")
 		info.FirstUserMessage = getFirstUserMessage(path, "pi")
-		info.LastMessageTime = getLastMessageTime(path)
+		info.LastMessageTime, info.IsActive, info.Status = getLastMessageTimeAndStatus(path)
 
 		if fi, err := d.Info(); err == nil {
 			info.Timestamp = fi.ModTime()
@@ -1499,7 +1564,7 @@ func (s *Server) listSessions() []SessionInfo {
 
 			info.LineCount, info.CWD, info.Model, info.InputTokens, info.OutputTokens, info.TotalTokens, info.TotalCost, info.ContextWindow = aggregateSessionData(path, "claude")
 			info.FirstUserMessage = getFirstUserMessage(path, "claude")
-			info.LastMessageTime = getLastMessageTime(path)
+			info.LastMessageTime, info.IsActive, info.Status = getLastMessageTimeAndStatus(path)
 
 			if fi, err := d.Info(); err == nil {
 				info.Timestamp = fi.ModTime()
@@ -1550,7 +1615,7 @@ func (s *Server) listSessions() []SessionInfo {
 				info.Project = filepath.Base(filepath.Dir(path))
 			}
 			info.FirstUserMessage = getFirstUserMessage(path, "codex")
-			info.LastMessageTime = getLastMessageTime(path)
+			info.LastMessageTime, info.IsActive, info.Status = getLastMessageTimeAndStatus(path)
 
 			if fi, err := d.Info(); err == nil {
 				info.Timestamp = fi.ModTime()
@@ -1564,6 +1629,16 @@ func (s *Server) listSessions() []SessionInfo {
 	sort.Slice(sessions, func(i, j int) bool {
 		return sessions[i].Timestamp.After(sessions[j].Timestamp)
 	})
+
+	// Mark IsUnread: sessions within 24h that haven't been read yet
+	if s.readTracker != nil {
+		cutoff := time.Now().Add(-24 * time.Hour)
+		for i := range sessions {
+			if sessions[i].Timestamp.After(cutoff) && s.readTracker.IsUnread(sessions[i].ID) {
+				sessions[i].IsUnread = true
+			}
+		}
+	}
 
 	return sessions
 }
@@ -1953,11 +2028,16 @@ func truncateMessage(s string) string {
 	return s
 }
 
-// getLastMessageTime reads the last line of the JSONL file and returns a formatted timestamp.
-func getLastMessageTime(path string) string {
+// getLastMessageTimeAndStatus reads the last line of the JSONL file and returns
+// a formatted timestamp and whether the session is still active.
+// A session is active if the last message was within 3 minutes AND the last
+// event is not a terminal event (turn_end, session_end, or message with a
+// terminal stopReason like end_turn/stop).
+// Status is "running", "completed", or "error".
+func getLastMessageTimeAndStatus(path string) (string, bool, string) {
 	allBuf, err := os.ReadFile(path)
 	if err != nil || len(allBuf) == 0 {
-		return ""
+		return "", false, "completed"
 	}
 
 	// Find the last non-empty line (skip trailing newlines)
@@ -1966,7 +2046,7 @@ func getLastMessageTime(path string) string {
 		end--
 	}
 	if end < 0 {
-		return ""
+		return "", false, "completed"
 	}
 
 	start := end
@@ -1976,25 +2056,61 @@ func getLastMessageTime(path string) string {
 
 	lastLine := allBuf[start : end+1]
 	if len(lastLine) == 0 {
-		return ""
+		return "", false, "completed"
 	}
 
 	var lineData struct {
-		Timestamp string `json:"timestamp"`
+		Type       string `json:"type"`
+		Timestamp  string `json:"timestamp"`
+		StopReason string `json:"stopReason"`
+		Message    *struct {
+			StopReason string `json:"stopReason"`
+		} `json:"message"`
+		Error string `json:"error"`
 	}
 	if err := json.Unmarshal(lastLine, &lineData); err != nil || lineData.Timestamp == "" {
-		return ""
+		return "", false, "completed"
 	}
 
 	t, err := time.Parse(time.RFC3339Nano, lineData.Timestamp)
 	if err != nil {
 		t, err = time.Parse("2006-01-02T15:04:05.000Z", lineData.Timestamp)
 		if err != nil {
-			return ""
+			return "", false, "completed"
 		}
 	}
 
-	return formatRelativeTime(t)
+	// Check if the last event is a terminal event
+	isTerminal := false
+	eventType := lineData.Type
+	if eventType == "turn_end" || eventType == "session_end" {
+		isTerminal = true
+	}
+	// Check stopReason at top level or nested in message
+	stopReason := lineData.StopReason
+	if lineData.Message != nil && lineData.Message.StopReason != "" {
+		stopReason = lineData.Message.StopReason
+	}
+	if stopReason == "end_turn" || stopReason == "stop" || stopReason == "completed" {
+		isTerminal = true
+	}
+
+	// Determine status
+	status := "completed"
+	isRecent := time.Since(t) < 3*time.Minute
+
+	// Check for error events
+	if lineData.Error != "" || eventType == "error" || stopReason == "error" || stopReason == "cancelled" {
+		status = "error"
+	}
+
+	// Active if recent AND not terminal
+	isActive := isRecent && !isTerminal
+	if isActive {
+		status = "running"
+	}
+
+	return formatRelativeTime(t), isActive, status
 }
 
 // formatRelativeTime returns a human-readable relative time string.
