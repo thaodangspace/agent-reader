@@ -350,7 +350,7 @@
 
   <!-- Diff content -->
   <div class="border-t border-ctp-surface0" class:hidden={collapsed}>
-    <div class="text-[11px] font-mono" style="background:color-mix(in srgb, #ffffff 50%, #ffffff);">
+    <div class="text-[11px] font-mono overflow-x-auto" style="background:color-mix(in srgb, #ffffff 50%, #ffffff);">
       {#each (edits ?? []) as edit, ei}
         {#if ei > 0}
           <div class="border-t border-ctp-surface0/50"></div>
@@ -371,7 +371,7 @@
                     </span>
                     <span class="w-5 shrink-0 select-none"
                       style="background:color-mix(in srgb, #e95f59 12%, #ffffff); color:#e95f59">-</span>
-                    <span class="flex-1 pr-3 whitespace-pre overflow-x-auto"
+                    <span class="flex-1 pr-3 whitespace-pre"
                       style="background:color-mix(in srgb, #e95f59 12%, #ffffff)">
                       {@html renderOldLine(pair.oldText, pair.newText)}
                     </span>
@@ -383,7 +383,7 @@
                     </span>
                     <span class="w-5 shrink-0 select-none"
                       style="background:color-mix(in srgb, #65b73b 12%, #ffffff); color:#65b73b">+</span>
-                    <span class="flex-1 pr-3 whitespace-pre overflow-x-auto"
+                    <span class="flex-1 pr-3 whitespace-pre"
                       style="background:color-mix(in srgb, #65b73b 12%, #ffffff)">
                       {@html renderNewLine(pair.oldText, pair.newText)}
                     </span>
@@ -396,7 +396,7 @@
                     </span>
                     <span class="w-5 shrink-0 select-none"
                       style="background:color-mix(in srgb, #e95f59 12%, #ffffff); color:#e95f59">-</span>
-                    <span class="flex-1 pr-3 whitespace-pre overflow-x-auto"
+                    <span class="flex-1 pr-3 whitespace-pre"
                       style="background:color-mix(in srgb, #e95f59 12%, #ffffff)">
                       {@html highlight(pair.oldText)}
                     </span>
@@ -409,7 +409,7 @@
                     </span>
                     <span class="w-5 shrink-0 select-none"
                       style="background:color-mix(in srgb, #65b73b 12%, #ffffff); color:#65b73b">+</span>
-                    <span class="flex-1 pr-3 whitespace-pre overflow-x-auto"
+                    <span class="flex-1 pr-3 whitespace-pre"
                       style="background:color-mix(in srgb, #65b73b 12%, #ffffff)">
                       {@html highlight(pair.newText)}
                     </span>
@@ -424,7 +424,7 @@
                 </span>
                 <span class="w-5 shrink-0 select-none"
                   style="background:color-mix(in srgb, #ffffff 50%, #ffffff); color:#777777"> </span>
-                <span class="flex-1 pr-3 whitespace-pre overflow-x-auto"
+                <span class="flex-1 pr-3 whitespace-pre"
                   style="background:color-mix(in srgb, #ffffff 50%, #ffffff)">
                   {@html highlight(segment.text)}
                 </span>
