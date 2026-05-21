@@ -25,7 +25,48 @@
     }
   });
 
-  let isEditTool = $derived(tc.name === 'edit' && parsedArgs);
+  let normalizedEditInfo = $derived.by(() => {
+    if (!parsedArgs) return null;
+
+    const filePath = parsedArgs.file_path || parsedArgs.TargetFile || parsedArgs.path || '';
+    let edits = [];
+
+    if (Array.isArray(parsedArgs.edits)) {
+      edits = parsedArgs.edits.map(e => ({
+        oldText: e.oldText ?? '',
+        newText: e.newText ?? ''
+      }));
+    } else if (Array.isArray(parsedArgs.ReplacementChunks)) {
+      edits = parsedArgs.ReplacementChunks.map(chunk => ({
+        oldText: chunk.TargetContent ?? '',
+        newText: chunk.ReplacementContent ?? ''
+      }));
+    } else if (typeof parsedArgs.old_string === 'string' || typeof parsedArgs.new_string === 'string') {
+      edits = [{
+        oldText: parsedArgs.old_string ?? '',
+        newText: parsedArgs.new_string ?? ''
+      }];
+    } else if (typeof parsedArgs.TargetContent === 'string' || typeof parsedArgs.ReplacementContent === 'string') {
+      edits = [{
+        oldText: parsedArgs.TargetContent ?? '',
+        newText: parsedArgs.ReplacementContent ?? ''
+      }];
+    }
+
+    const nameLower = (tc.name || '').toLowerCase();
+    const isEdit = (
+      nameLower === 'edit' ||
+      nameLower === 'replace_file_content' ||
+      nameLower === 'multi_replace_file_content' ||
+      (filePath && edits.length > 0)
+    );
+
+    if (isEdit && filePath) {
+      return { filePath, edits };
+    }
+    return null;
+  });
+
   let isWriteTool = $derived(tc.name === 'write' && parsedArgs);
   let isReadTool = $derived(tc.name === 'read');
 
@@ -97,8 +138,8 @@
   }
 </script>
 
-{#if isEditTool}
-  <DiffView filePath={parsedArgs.path} edits={parsedArgs.edits} />
+{#if normalizedEditInfo}
+  <DiffView filePath={normalizedEditInfo.filePath} edits={normalizedEditInfo.edits} />
 {:else if isWriteTool}
   <div class="rounded-lg overflow-hidden border border-ctp-surface0 mb-2" style="background:color-mix(in srgb, #135ce0 8%, #f6f6f6)">
     <button class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer" onclick={toggle}>
