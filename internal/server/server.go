@@ -1599,7 +1599,7 @@ func scanCodexLines(path string, visit func([]byte) bool) {
 	}
 	defer f.Close()
 
-	reader := bufio.NewReaderSize(f, 2*1024*1024)
+	reader := bufio.NewReaderSize(f, 64*1024)
 	for {
 		line, err := reader.ReadBytes('\n')
 		if len(line) > 0 {
@@ -1615,7 +1615,14 @@ func scanCodexLines(path string, visit func([]byte) bool) {
 }
 
 func bytesTrimRightNewline(line []byte) []byte {
-	return []byte(strings.TrimRight(string(line), "\r\n"))
+	for len(line) > 0 {
+		last := line[len(line)-1]
+		if last != '\n' && last != '\r' {
+			break
+		}
+		line = line[:len(line)-1]
+	}
+	return line
 }
 
 // getContextWindow returns the context window size for a given model ID.
