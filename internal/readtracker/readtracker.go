@@ -52,13 +52,24 @@ func New(dbPath string, ttl time.Duration) (*ReadTracker, error) {
 	query := `
 	CREATE TABLE IF NOT EXISTS read_sessions (
 		session_id TEXT PRIMARY KEY,
-		marked_at TIMESTAMP NOT NULL
+		marked_at TIMESTAMP NOT NULL,
+		last_seen_lines INTEGER NOT NULL DEFAULT 0
 	);
 	CREATE INDEX IF NOT EXISTS idx_read_sessions_marked_at ON read_sessions(marked_at);
 	`
 	if _, err := db.Exec(query); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("create schema: %w", err)
+	}
+
+	// Migration: add last_seen_lines column if it doesn't exist (for existing DBs)
+	var colExists int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('read_sessions') WHERE name='last_seen_lines'`).Scan(&colExists); err == nil && colExists == 0 {
+		if _, migrErr := db.Exec(`ALTER TABLE read_sessions ADD COLUMN last_seen_lines INTEGER NOT NULL DEFAULT 0`); migrErr != nil {
+			log.Printf("[readtracker] warning: failed to add last_seen_lines column: %v", migrErr)
+		} else {
+			log.Printf("[readtracker] migrated: added last_seen_lines column")
+		}
 	}
 
 	rt := &ReadTracker{
@@ -73,40 +84,41 @@ func New(dbPath string, ttl time.Duration) (*ReadTracker, error) {
 	return rt, nil
 }
 
-// MarkRead marks a session as read.
-func (rt *ReadTracker) MarkRead(sessionID string) {
+// MarkRead marks a session as read, recording the line count the user has seen.
+// A session is considered unread again when its current line count exceeds lastSeenLines.
+func (rt *ReadTracker) MarkRead(sessionID string, lastSeenLines int) {
 	query := `
-	INSERT INTO read_sessions (session_id, marked_at)
-	VALUES (?, ?)
-	ON CONFLICT(session_id) DO UPDATE SET marked_at = excluded.marked_at
+	INSERT INTO read_sessions (session_id, marked_at, last_seen_lines)
+	VALUES (?, ?, ?)
+	ON CONFLICT(session_id) DO UPDATE SET marked_at = excluded.marked_at, last_seen_lines = excluded.last_seen_lines
 	`
-	_, err := rt.db.Exec(query, sessionID, time.Now())
+	_, err := rt.db.Exec(query, sessionID, time.Now(), lastSeenLines)
 	if err != nil {
 		log.Printf("[readtracker] failed to mark session %s as read: %v", sessionID, err)
 	}
 }
 
-// IsRead returns true if the session has been marked as read and the entry has not expired.
-func (rt *ReadTracker) IsRead(sessionID string) bool {
-	var exists bool
+// IsRead returns true if the session has been marked as read, the entry has not expired,
+// and the current line count has not exceeded the last seen line count.
+func (rt *ReadTracker) IsRead(sessionID string, currentLines int) bool {
+	var lastSeenLines int
 	cutoff := time.Now().Add(-rt.ttl)
 	query := `
-	SELECT EXISTS(
-		SELECT 1 FROM read_sessions
-		WHERE session_id = ? AND marked_at >= ?
-	)
+	SELECT last_seen_lines FROM read_sessions
+	WHERE session_id = ? AND marked_at >= ?
 	`
-	err := rt.db.QueryRow(query, sessionID, cutoff).Scan(&exists)
+	err := rt.db.QueryRow(query, sessionID, cutoff).Scan(&lastSeenLines)
 	if err != nil {
-		log.Printf("[readtracker] failed to query read status for session %s: %v", sessionID, err)
+		// Not found or expired → unread
 		return false
 	}
-	return exists
+	return currentLines <= lastSeenLines
 }
 
-// IsUnread returns true if the session has NOT been marked as read (or the entry has expired).
-func (rt *ReadTracker) IsUnread(sessionID string) bool {
-	return !rt.IsRead(sessionID)
+// IsUnread returns true if the session has NOT been marked as read (or the entry has expired),
+// or if new lines have been added since the user last viewed it.
+func (rt *ReadTracker) IsUnread(sessionID string, currentLines int) bool {
+	return !rt.IsRead(sessionID, currentLines)
 }
 
 // cleanupLoop periodically removes expired entries.

@@ -25,8 +25,16 @@ export async function selectSession(id) {
 
   activeSession.set(id);
 
-  // Mark as read
-  markSessionRead(id).catch(() => {});
+  // Fetch session info first so we know the current line count
+  let sessionInfo = null;
+  try {
+    sessionInfo = await fetchSession(id);
+    activeSessionPath.set(sessionInfo.file);
+  } catch {}
+
+  // Mark as read with current line count (user has seen everything up to this point)
+  const lineCount = sessionInfo?.line_count || 0;
+  markSessionRead(id, lineCount).catch(() => {});
   unreadSessionIds.update(set => {
     set.delete(id);
     return new Set(set);
@@ -41,13 +49,6 @@ export async function selectSession(id) {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: 'subscribe', session_id: id }));
   }
-
-  // Fetch session info
-  let sessionInfo = null;
-  try {
-    sessionInfo = await fetchSession(id);
-    activeSessionPath.set(sessionInfo.file);
-  } catch {}
 }
 
 export async function quitSession() {

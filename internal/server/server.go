@@ -421,10 +421,15 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		if s.readTracker != nil {
-			s.readTracker.MarkRead(markReadID)
+		// Optionally accept line_count in request body
+		var req struct {
+			LineCount int `json:"line_count"`
 		}
-		log.Printf("[server] session marked as read: %s", markReadID)
+		json.NewDecoder(r.Body).Decode(&req) // ignore error, line_count defaults to 0
+		if s.readTracker != nil {
+			s.readTracker.MarkRead(markReadID, req.LineCount)
+		}
+		log.Printf("[server] session marked as read: %s (seen_lines=%d)", markReadID, req.LineCount)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
@@ -463,7 +468,7 @@ func (s *Server) handleUnreadIDs(w http.ResponseWriter, r *http.Request) {
 		sessions := s.listSessions()
 		cutoff := time.Now().Add(-24 * time.Hour)
 		for _, sess := range sessions {
-			if sess.Timestamp.After(cutoff) && s.readTracker.IsUnread(sess.ID) {
+			if sess.Timestamp.After(cutoff) && s.readTracker.IsUnread(sess.ID, sess.LineCount) {
 				ids = append(ids, sess.ID)
 			}
 		}
@@ -1630,11 +1635,11 @@ func (s *Server) listSessions() []SessionInfo {
 		return sessions[i].Timestamp.After(sessions[j].Timestamp)
 	})
 
-	// Mark IsUnread: sessions within 24h that haven't been read yet
+	// Mark IsUnread: sessions within 24h that have new content since the user last viewed them
 	if s.readTracker != nil {
 		cutoff := time.Now().Add(-24 * time.Hour)
 		for i := range sessions {
-			if sessions[i].Timestamp.After(cutoff) && s.readTracker.IsUnread(sessions[i].ID) {
+			if sessions[i].Timestamp.After(cutoff) && s.readTracker.IsUnread(sessions[i].ID, sessions[i].LineCount) {
 				sessions[i].IsUnread = true
 			}
 		}

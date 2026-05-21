@@ -21,7 +21,7 @@
   let imageList = $derived(imagePaths.map(path => ({ src: imageViewUrl(path) })));
 
   // Tool section collapse state
-  let toolsCollapsed = $state(true);
+  let toolsCollapsed = $state(false);
 
   // Image viewer state
   let showViewer = $state(false);

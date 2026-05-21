@@ -28,9 +28,11 @@ export async function fetchUnreadIds() {
   return new Set(data.unread_ids || []);
 }
 
-export async function markSessionRead(id) {
+export async function markSessionRead(id, lineCount = 0) {
   const res = await fetch(`/api/sessions/${id}/mark-read`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ line_count: lineCount }),
   });
   if (!res.ok) throw new Error('Failed to mark session as read');
   return res.json();

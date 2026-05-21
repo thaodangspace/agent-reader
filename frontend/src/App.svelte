@@ -12,6 +12,7 @@
   import HeaderBar from '$lib/components/HeaderBar.svelte';
   import ChatArea from '$lib/components/ChatArea.svelte';
   import NewSessionModal from '$lib/components/NewSessionModal.svelte';
+  import ToastContainer from '$lib/components/ToastContainer.svelte';
 
   let isMobile = $state(false);
 
@@ -36,9 +37,15 @@
       fetchSessions(currentSortBy, currentGroupBy)
         .then(list => sessions.set(list))
         .catch(e => console.error('Failed to fetch sessions:', e));
-      // Refresh unread status
+      // Refresh unread status (exclude the active session — user is already viewing it)
       fetchUnreadIds()
-        .then(ids => unreadSessionIds.set(ids))
+        .then(ids => {
+          const unsub = activeSession.subscribe(activeId => {
+            if (activeId) ids.delete(activeId);
+          });
+          unsub();
+          unreadSessionIds.set(ids);
+        })
         .catch(() => {});
     }
 
@@ -89,8 +96,15 @@
       fetchSessions(currentSortBy, currentGroupBy)
         .then(list => sessions.set(list))
         .catch(() => {});
+      // Refresh unread status (exclude the active session — user is already viewing it)
       fetchUnreadIds()
-        .then(ids => unreadSessionIds.set(ids))
+        .then(ids => {
+          const unsub = activeSession.subscribe(activeId => {
+            if (activeId) ids.delete(activeId);
+          });
+          unsub();
+          unreadSessionIds.set(ids);
+        })
         .catch(() => {});
     }, 5000);
 
@@ -134,4 +148,7 @@
 
   <!-- New Session Modal -->
   <NewSessionModal />
+
+  <!-- Toast Container -->
+  <ToastContainer />
 </div>

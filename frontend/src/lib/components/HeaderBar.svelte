@@ -7,9 +7,11 @@
   import { createSession, fetchSessions } from '$lib/api/sessions.js';
   import { selectSession } from '$lib/actions/session.js';
   import { formatTokens } from '$lib/utils/format.js';
-  import { Menu, Plus } from '@lucide/svelte';
+  import { Menu, Plus, Info } from '@lucide/svelte';
+  import SessionInfoModal from './SessionInfoModal.svelte';
 
   let sessionInfo = $state(null);
+  let infoModalOpen = $state(false);
   let creating = $state(false);
 
   function fetchSessionInfo(id) {
@@ -93,6 +95,13 @@
           {sessionInfo.cwd.length > 50 ? '...' + sessionInfo.cwd.slice(-47) : sessionInfo.cwd}
         </span>
       {/if}
+      <button
+        class="p-1 rounded-md text-ctp-overlay0 hover:text-ctp-blue hover:bg-ctp-blue/10 transition-all cursor-pointer flex items-center justify-center shrink-0 animate-fadeIn"
+        onclick={() => infoModalOpen = true}
+        title="Show Session Info"
+      >
+        <Info size={14} />
+      </button>
 
     {:else if $activeSession}
       <span
@@ -137,3 +146,5 @@
     <Menu class="h-4 w-4" />
   </button>
 </div>
+
+<SessionInfoModal show={infoModalOpen} sessionInfo={sessionInfo} onClose={() => infoModalOpen = false} />

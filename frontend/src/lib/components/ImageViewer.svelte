@@ -3,8 +3,12 @@
   import { X, ChevronLeft, ChevronRight } from '@lucide/svelte';
 
   let { images, startIndex = 0, onClose } = $props();
-  let currentIndex = $state(startIndex);
+  let currentIndex = $state(0);
   let visible = $state(true);
+
+  $effect(() => {
+    currentIndex = startIndex;
+  });
 
   let currentSrc = $derived(images[currentIndex]?.src || '');
   let currentAlt = $derived(images[currentIndex]?.alt || '');

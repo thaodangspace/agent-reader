@@ -21,22 +21,36 @@ func TestReadTrackerBasic(t *testing.T) {
 	sessionID := "session-123"
 
 	// Initially, it should be unread
-	if !rt.IsUnread(sessionID) {
+	if !rt.IsUnread(sessionID, 10) {
 		t.Errorf("expected session %s to be unread initially", sessionID)
 	}
-	if rt.IsRead(sessionID) {
+	if rt.IsRead(sessionID, 10) {
 		t.Errorf("expected session %s NOT to be read initially", sessionID)
 	}
 
-	// Mark as read
-	rt.MarkRead(sessionID)
+	// Mark as read with 10 lines seen
+	rt.MarkRead(sessionID, 10)
 
-	// Now it should be read
-	if !rt.IsRead(sessionID) {
+	// Now it should be read (current lines = 10, last seen = 10)
+	if !rt.IsRead(sessionID, 10) {
 		t.Errorf("expected session %s to be marked read", sessionID)
 	}
-	if rt.IsUnread(sessionID) {
+	if rt.IsUnread(sessionID, 10) {
 		t.Errorf("expected session %s NOT to be unread", sessionID)
+	}
+
+	// New messages arrive → 15 lines → should be unread
+	if rt.IsRead(sessionID, 15) {
+		t.Errorf("expected session %s to be unread after new messages (15 > 10)", sessionID)
+	}
+	if !rt.IsUnread(sessionID, 15) {
+		t.Errorf("expected session %s to be unread after new messages (15 > 10)", sessionID)
+	}
+
+	// User re-opens → mark read with 15 lines
+	rt.MarkRead(sessionID, 15)
+	if !rt.IsRead(sessionID, 15) {
+		t.Errorf("expected session %s to be marked read again", sessionID)
 	}
 }
 
@@ -55,8 +69,8 @@ func TestReadTrackerTTLAndCleanup(t *testing.T) {
 	session2 := "session-expired"
 
 	// Mark both as read
-	rt.MarkRead(session1)
-	rt.MarkRead(session2)
+	rt.MarkRead(session1, 10)
+	rt.MarkRead(session2, 10)
 
 	// Force-update the marked_at timestamp of session2 directly in DB to simulate expiration
 	expiredTime := time.Now().Add(-5 * time.Hour)
@@ -66,10 +80,10 @@ func TestReadTrackerTTLAndCleanup(t *testing.T) {
 	}
 
 	// Active one should still be read, expired one should not
-	if !rt.IsRead(session1) {
+	if !rt.IsRead(session1, 10) {
 		t.Errorf("expected %s to be read", session1)
 	}
-	if rt.IsRead(session2) {
+	if rt.IsRead(session2, 10) {
 		t.Errorf("expected %s to be expired (not read)", session2)
 	}
 
@@ -111,8 +125,8 @@ func TestReadTrackerConcurrency(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < 50; j++ {
 				sessionID := "session-i-j"
-				rt.MarkRead(sessionID)
-				_ = rt.IsRead(sessionID)
+				rt.MarkRead(sessionID, j)
+				_ = rt.IsRead(sessionID, j)
 			}
 			done <- true
 		}(i)

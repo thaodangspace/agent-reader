@@ -2,7 +2,7 @@
   import ToolResultBlock from './ToolResultBlock.svelte';
 
   let { results } = $props();
-  let collapsed = $state(true);
+  let collapsed = $state(false);
 </script>
 
 <div class="flex flex-col items-start animate-fadeIn w-full">
