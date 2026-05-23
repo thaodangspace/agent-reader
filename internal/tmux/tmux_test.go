@@ -88,14 +88,14 @@ agent-work|1|2|1779266400|1
 
 func TestStopWithoutStart(t *testing.T) {
 	t.Parallel()
-	a := NewAttach("nonexistent-session")
+	a := NewAttach("nonexistent-session", -1)
 	// Should not deadlock
 	a.Stop()
 }
 
 func TestDoubleStop(t *testing.T) {
 	t.Parallel()
-	a := NewAttach("nonexistent-session")
+	a := NewAttach("nonexistent-session", -1)
 	go a.Start()
 	// Give Start a moment to begin
 	time.Sleep(50 * time.Millisecond)
@@ -106,8 +106,58 @@ func TestDoubleStop(t *testing.T) {
 
 func TestStopWithoutStart_NonEmptyPanic(t *testing.T) {
 	t.Parallel()
-	a := NewAttach("nonexistent-session")
+	a := NewAttach("nonexistent-session", -1)
 	// Stop twice without ever starting — must not panic
 	a.Stop()
 	a.Stop()
+}
+
+func TestListWindows_Parsing(t *testing.T) {
+	t.Parallel()
+
+	input := `0|bash|1|1
+1|nvim|0|1
+2||0|2
+`
+
+	var windows []Window
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 {
+			t.Fatalf("expected 4 parts, got %d for line: %s", len(parts), line)
+		}
+
+		index, _ := strconv.Atoi(parts[0])
+		panes, _ := strconv.Atoi(parts[3])
+
+		windows = append(windows, Window{
+			Index:  index,
+			Name:   parts[1],
+			Active: parts[2] == "1",
+			Panes:  panes,
+		})
+	}
+
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scanner error: %v", err)
+	}
+
+	if len(windows) != 3 {
+		t.Fatalf("expected 3 windows, got %d", len(windows))
+	}
+
+	if windows[0].Index != 0 || windows[0].Name != "bash" || !windows[0].Active {
+		t.Errorf("window 0: %+v", windows[0])
+	}
+	if windows[1].Index != 1 || windows[1].Name != "nvim" || windows[1].Active {
+		t.Errorf("window 1: %+v", windows[1])
+	}
+	if windows[2].Index != 2 || windows[2].Name != "" || windows[2].Active || windows[2].Panes != 2 {
+		t.Errorf("window 2: %+v", windows[2])
+	}
 }

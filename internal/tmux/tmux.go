@@ -3,6 +3,7 @@ package tmux
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -18,6 +19,51 @@ type Session struct {
 	Panes    int       `json:"panes"`
 	Created  time.Time `json:"created"`
 	Attached bool      `json:"attached"`
+}
+
+// Window represents a tmux window within a session.
+type Window struct {
+	Index  int    `json:"index"`
+	Name   string `json:"name"`   // may be empty
+	Active bool   `json:"active"`
+	Panes  int    `json:"panes"`
+}
+
+// ListWindows returns all windows in a tmux session.
+func ListWindows(sessionName string) ([]Window, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "tmux", "list-windows", "-t", sessionName, "-F", "#{window_index}|#{window_name}|#{window_active}|#{window_panes}")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var windows []Window
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 {
+			continue
+		}
+
+		index, _ := strconv.Atoi(parts[0])
+		panes, _ := strconv.Atoi(parts[3])
+
+		windows = append(windows, Window{
+			Index:  index,
+			Name:   parts[1],
+			Active: parts[2] == "1",
+			Panes:  panes,
+		})
+	}
+
+	return windows, scanner.Err()
 }
 
 // IsAvailable checks if the tmux binary exists on the system.
@@ -71,6 +117,7 @@ func ListSessions() ([]Session, error) {
 // SessionAttach manages live streaming to a tmux session's active pane.
 type SessionAttach struct {
 	sessionName string
+	windowIndex *int          // nil = active window, explicit = target specific window
 	stopOnce    sync.Once     // guards single close of stopCh
 	stopCh      chan struct{} // closed by Stop() to signal Start() to exit
 	doneCh      chan struct{} // closed when Start()'s goroutine exits
@@ -80,14 +127,27 @@ type SessionAttach struct {
 	started     atomic.Bool // true once Start() has begun running
 }
 
+// target returns the tmux target string, including window index if set.
+func (a *SessionAttach) target() string {
+	if a.windowIndex != nil {
+		return fmt.Sprintf("%s:%d", a.sessionName, *a.windowIndex)
+	}
+	return a.sessionName
+}
+
 // NewAttach creates a new SessionAttach for the given session.
-func NewAttach(sessionName string) *SessionAttach {
-	return &SessionAttach{
+// If windowIndex is >= 0, it targets that specific window; otherwise the active window.
+func NewAttach(sessionName string, windowIndex int) *SessionAttach {
+	a := &SessionAttach{
 		sessionName: sessionName,
 		stopCh:      make(chan struct{}),
 		doneCh:      make(chan struct{}),
 		subscribers: make(map[chan string]bool),
 	}
+	if windowIndex >= 0 {
+		a.windowIndex = &windowIndex
+	}
+	return a
 }
 
 // Start begins the polling loop and blocks until Stop is called or the session dies.
@@ -174,7 +234,7 @@ func (a *SessionAttach) SendKeys(text string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "tmux", "send-keys", "-t", a.sessionName, "-l", "--", text)
+	cmd := exec.CommandContext(ctx, "tmux", "send-keys", "-t", a.target(), "-l", "--", text)
 	return cmd.Run()
 }
 
@@ -183,7 +243,7 @@ func (a *SessionAttach) SendKey(key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "tmux", "send-keys", "-t", a.sessionName, key)
+	cmd := exec.CommandContext(ctx, "tmux", "send-keys", "-t", a.target(), key)
 	return cmd.Run()
 }
 
@@ -206,7 +266,7 @@ func (a *SessionAttach) capturePane() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "tmux", "capture-pane", "-p", "-e", "-t", a.sessionName)
+	cmd := exec.CommandContext(ctx, "tmux", "capture-pane", "-p", "-e", "-t", a.target())
 	output, err := cmd.Output()
 	if err != nil {
 		return ""
