@@ -68,7 +68,9 @@
       try {
         const msg = JSON.parse(ev.data);
         if (msg.type === 'data' && terminal) {
-          terminal.write(msg.content);
+          // Clear screen and home cursor before writing captured content
+          // so cursor positioning codes from capture-pane are interpreted correctly
+          terminal.write('\x1b[2J\x1b[H' + msg.content);
         } else if (msg.type === 'session_end') {
           status = 'ended';
           socket.close();
