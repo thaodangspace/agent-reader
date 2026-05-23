@@ -13,6 +13,8 @@
   import ChatArea from '$lib/components/ChatArea.svelte';
   import NewSessionModal from '$lib/components/NewSessionModal.svelte';
   import ToastContainer from '$lib/components/ToastContainer.svelte';
+  import TmuxSessionPicker from '$lib/components/TmuxSessionPicker.svelte';
+  import TmuxTerminalModal from '$lib/components/TmuxTerminalModal.svelte';
 
   let isMobile = $state(false);
 
@@ -151,4 +153,10 @@
 
   <!-- Toast Container -->
   <ToastContainer />
+
+  <!-- tmux Session Picker -->
+  <TmuxSessionPicker />
+
+  <!-- tmux Terminal Modal -->
+  <TmuxTerminalModal />
 </div>
