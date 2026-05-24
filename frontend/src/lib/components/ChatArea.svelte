@@ -5,7 +5,7 @@
   import { activeSession, sessions } from '$lib/stores/session.svelte.js';
   import { userScrolledUp, newMessageCount } from '$lib/stores/messages.svelte.js';
   import { sendMessage, abortRPC, ensureRpcRunning } from '$lib/actions/rpc.js';
-  import { MessageSquare, Lightbulb, Wrench, Image, X, Paperclip, ChevronUp, RefreshCw, Check } from '@lucide/svelte';
+  import { MessageSquare, Lightbulb, Wrench, Image, X, Paperclip, ChevronUp, RefreshCw, Check, Terminal } from '@lucide/svelte';
 
   import MessageBubble from './MessageBubble.svelte';
   import AssistantBubble from './AssistantBubble.svelte';
@@ -21,6 +21,11 @@
   import { sessionCommands, commandsLoading } from '$lib/stores/commands.svelte.js';
   import { availableModels, setModelsForSession, clearModelsForSession } from '$lib/stores/models.svelte.js';
   import { findSession, readOnlySessionLabel, sessionSupportsRPC } from '$lib/utils/sessionCapabilities.js';
+  import { tmuxSessionPickerOpen } from '$lib/stores/tmux.svelte.js';
+
+  function openTmuxPicker() {
+    tmuxSessionPickerOpen.set(true);
+  }
 
   let input = $state('');
   let textareaEl = $state(null);
@@ -518,7 +523,7 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col min-h-0">
+<div class="flex-1 flex flex-col min-h-0 relative">
   <!-- Top Horizontal Scrollbar -->
   {#if showTopScroll}
     <div
@@ -633,6 +638,16 @@
   <!-- Input Area (hidden for read-only sessions: Claude / Codex) -->
   {#if activeSessionCanChat}
   <div class="border-t border-ctp-crust bg-ctp-mantle relative w-full">
+    <!-- Floating tmux Connect Button (anchored to top of input area to prevent overlaps) -->
+    {#if activeSessionInfo}
+      <button
+        class="absolute -top-16 right-6 z-40 w-12 h-12 rounded-full shadow-lg bg-ctp-green text-ctp-crust hover:bg-ctp-green/90 transition-all hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer group hover:shadow-xl hover:shadow-ctp-green/20"
+        title="Connect to tmux session"
+        onclick={openTmuxPicker}
+      >
+        <Terminal size={20} class="group-hover:scale-110 transition-transform" />
+      </button>
+    {/if}
     <!-- Overlay to close model picker on click -->
     {#if showModelPicker}
       <div
@@ -872,5 +887,16 @@
       </div>
     {/if}
   </div>
+  {/if}
+
+  <!-- Floating tmux Connect Button (read-only sessions with no input area) -->
+  {#if !activeSessionCanChat && $activeSession && activeSessionInfo}
+    <button
+      class="absolute bottom-6 right-6 z-40 w-12 h-12 rounded-full shadow-lg bg-ctp-green text-ctp-crust hover:bg-ctp-green/90 transition-all hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer group hover:shadow-xl hover:shadow-ctp-green/20"
+      title="Connect to tmux session"
+      onclick={openTmuxPicker}
+    >
+      <Terminal size={20} class="group-hover:scale-110 transition-transform" />
+    </button>
   {/if}
 </div>
